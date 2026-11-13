@@ -51,7 +51,7 @@ source (`Interpreter.cs`, `RuleNode.cs`, `OneNode.cs`, `AllNode.cs`, `ParallelNo
 | Styling        | CSS modules (or Tailwind if adopted — pick one, don't mix)                          |
 | Rendering      | `<canvas>` 2D with `ImageData`; WebGL only if profiling demands                     |
 | Engine runtime | Dedicated Web Worker, messages via a typed protocol (Comlink ok)                    |
-| XML            | `DOMParser` in the browser; `@xmldom/xmldom` shim in Node tests                     |
+| XML            | Small in-house parser in the engine (`DOMParser` doesn't exist in Web Workers)      |
 | Tests          | Vitest (engine unit + golden tests), Playwright (UI smoke)                          |
 | Lint / format  | ESLint + Prettier                                                                   |
 | Package mgr    | npm workspaces (`@mj/engine`, `@mj/app`), Node 22 (`.nvmrc`)                        |
@@ -143,7 +143,7 @@ Layout: left = **program tree**, centre = **canvas preview**, right = **inspecto
 ## Roadmap
 
 1. ✅ **Scaffold** — workspaces, Vite app, Vitest, ESLint/Prettier, CI (lint + typecheck + test).
-2. **Engine MVP** — grid, rules, wildcards, unions, 2D symmetry, `one`, `all`, `prl`,
+2. ✅ **Engine MVP** — grid, rules, wildcards, unions, 2D symmetry, `one`, `all`, `prl`,
    `markov`, `sequence`, `steps`, seeded RNG, XML import. Golden tests vs. known outputs.
 3. **Preview MVP** — worker + canvas + transport; load a program from XML and watch it run.
 4. **Visual editor** — palette, node tree, rule painter, inspector, two-way XML sync.
@@ -169,6 +169,11 @@ npm run typecheck    # tsc --noEmit across workspaces
 Run `npm run lint && npm run format:check && npm run typecheck && npm test` before every commit.
 
 Notes:
+
+- Golden tests (`packages/engine/test/golden.test.ts`) snapshot program + seed → grid hash.
+  If engine behaviour changes **intentionally**, update with
+  `npx vitest run -u --root packages/engine` and say why in the commit message.
+- Engine design, module map and execution model: `docs/architecture.md`.
 
 - The app imports the engine from source (`@mj/engine` → `packages/engine/src/index.ts`);
   there is no separate engine build step.
