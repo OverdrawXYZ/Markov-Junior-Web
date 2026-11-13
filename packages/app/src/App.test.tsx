@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { App } from './App';
 import { useApp } from './store/app';
 
@@ -54,12 +54,15 @@ describe('App', () => {
     ).toBeInTheDocument();
   });
 
-  it('switches examples', async () => {
+  it('switches examples from the gallery', async () => {
     await renderApp();
-    act(() => {
-      fireEvent.change(screen.getAllByRole('combobox')[0]!, { target: { value: 'River' } });
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Examples' }));
+    const gallery = screen.getByRole('dialog', { name: 'Examples' });
+    expect(within(gallery).getAllByRole('listitem')).toHaveLength(10);
+    fireEvent.click(within(gallery).getByRole('button', { name: /^River:/ }));
+    expect(screen.queryByRole('dialog')).toBeNull();
     await waitFor(() => expect(useApp.getState().program?.values).toBe('BWRUGE'));
     expect(screen.getByRole('spinbutton', { name: 'Grid width' })).toHaveValue(80);
+    expect(screen.getByTestId('project-name')).toHaveTextContent('River');
   });
 });

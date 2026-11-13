@@ -80,7 +80,10 @@ source (`Interpreter.cs`, `RuleNode.cs`, `OneNode.cs`, `AllNode.cs`, `ParallelNo
 │       ├── src/
 │       │   ├── worker/         # engine worker entry + message protocol
 │       │   ├── components/
-│       │   │   ├── Canvas/         # grid renderer, zoom, hover readout
+│       │   │   ├── Header/         # project name, examples/open/save/share, dialogs
+│       │   │   ├── Gallery/        # examples gallery with rendered thumbnails
+│       │   │   ├── Modal/          # accessible dialog
+│       │   │   ├── Canvas/         # grid renderer, zoom, pan, hover readout, PNG
 │       │   │   ├── NodeTree/       # program tree: select, add, drag/drop, keyboard
 │       │   │   ├── Inspector/      # selected node's properties + rules list
 │       │   │   ├── RuleEditor/     # paint in/out patterns, resize, symmetry preview, p
@@ -88,9 +91,10 @@ source (`Interpreter.cs`, `RuleNode.cs`, `OneNode.cs`, `AllNode.cs`, `ParallelNo
 │       │   │   ├── PatternView/    # a rule pattern as a tiny colour grid
 │       │   │   ├── Transport/      # run / pause / step / reset / speed / seed / size
 │       │   │   └── XmlPanel/       # XML editor + inline errors
-│       │   ├── editor/         # pure AST edit operations (ops.ts) + UI labels
+│       │   ├── editor/         # AST ops (ops.ts), project actions + shortcuts (actions.ts), labels
 │       │   ├── render/         # palette LUT + ImageData painting
-│       │   ├── store/          # Zustand store (app.ts) + frames bus (frames.ts)
+│       │   ├── store/          # app.ts (Zustand), frames.ts, persist.ts (save/share), session.ts
+│       │   ├── util/           # downloads, file names
 │       │   └── examples/       # bundled sample programs (MIT, attributed)
 │       └── e2e/
 └── docs/
@@ -151,7 +155,7 @@ Layout: left = **program tree**, centre = **canvas preview**, right = **inspecto
    `markov`, `sequence`, `steps`, seeded RNG, XML import. Golden tests vs. known outputs.
 3. ✅ **Preview MVP** — worker + canvas + transport; load a program from XML and watch it run.
 4. ✅ **Visual editor** — palette, node tree, rule painter, inspector, two-way XML sync.
-5. **Polish** — examples gallery, persistence, share URLs, PNG export, keyboard shortcuts.
+5. ✅ **Polish** — examples gallery, persistence, share URLs, PNG export, keyboard shortcuts.
 6. **Advanced engine** — `field`s/temperature, `observe` + search, `map`, `path`,
    `convolution`, `convchain`, `wfc`.
 7. **3D** — 3D grids, cube symmetries, isometric/voxel preview (three.js).
@@ -181,6 +185,10 @@ Notes:
   `docs/architecture.md`.
 - All program edits from the UI go through `packages/app/src/editor/ops.ts` (pure, tested) and
   `useApp().edit(fn, { coalesce })`. Don't mutate the AST in components.
+- Share links (`#p=z…`/`#p=j…`) and the autosave key (`mj.project.v1`) are a compatibility
+  contract — people bookmark and send links. Add a new prefix/key instead of changing them.
+- Keyboard shortcuts live in one table, `SHORTCUTS` in `editor/actions.ts`; the help dialog is
+  generated from it.
 - Zustand selectors must return stable values: select the raw array/object and derive in the
   component. A selector that returns a new array (e.g. `s.issues.filter(...)`) loops forever.
 

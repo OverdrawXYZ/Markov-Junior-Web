@@ -1,77 +1,37 @@
 import { useEffect } from 'react';
-import { ENGINE_VERSION } from '@mj/engine';
 import { Canvas } from './components/Canvas/Canvas';
+import { Header } from './components/Header/Header';
+import { handleShortcut, importFile } from './editor/actions';
 import { Inspector } from './components/Inspector/Inspector';
 import { NodeTree } from './components/NodeTree/NodeTree';
 import { PalettePanel } from './components/Palette/PalettePanel';
 import { Transport } from './components/Transport/Transport';
 import { XmlPanel } from './components/XmlPanel/XmlPanel';
-import { EXAMPLES } from './examples';
 import { startEngine, useApp, type Tab } from './store/app';
 import styles from './App.module.css';
 
-function ExamplePicker() {
-  const exampleId = useApp((s) => s.exampleId);
-  const loadExample = useApp((s) => s.loadExample);
-  const current = EXAMPLES.find((e) => e.id === exampleId);
-  return (
-    <label className={styles.picker}>
-      <span className={styles.pickerLabel}>Example</span>
-      <select
-        value={exampleId ?? ''}
-        onChange={(e) => loadExample(e.target.value)}
-        title={current?.description}
-      >
-        {exampleId === null && <option value="">Custom program</option>}
-        {EXAMPLES.map((e) => (
-          <option key={e.id} value={e.id}>
-            {e.name}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function UndoRedo() {
-  const canUndo = useApp((s) => s.past.length > 0);
-  const canRedo = useApp((s) => s.future.length > 0);
-  const undo = useApp((s) => s.undo);
-  const redo = useApp((s) => s.redo);
-  return (
-    <span className={styles.history}>
-      <button type="button" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">
-        Undo
-      </button>
-      <button type="button" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">
-        Redo
-      </button>
-    </span>
-  );
-}
-
-/** Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or Ctrl+Y), except inside text fields, which have their own undo. */
-function useUndoShortcuts() {
+/** Global keyboard shortcuts, and dropping an .xml file anywhere on the page. */
+function useGlobalInput() {
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return;
-      const target = e.target;
-      if (
-        target instanceof Element &&
-        target.closest('input, textarea, select, [contenteditable="true"]')
-      )
-        return;
-      const key = e.key.toLowerCase();
-      if (key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        useApp.getState().undo();
-      } else if ((key === 'z' && e.shiftKey) || key === 'y') {
-        e.preventDefault();
-        useApp.getState().redo();
-      }
+    const onKeyDown = (e: KeyboardEvent) => void handleShortcut(e);
+    const isFileDrag = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files');
+    const onDragOver = (e: DragEvent) => {
+      if (isFileDrag(e)) e.preventDefault();
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+      const file = e.dataTransfer?.files[0];
+      if (file) void importFile(file);
     };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('dragover', onDragOver);
+    window.addEventListener('drop', onDrop);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('dragover', onDragOver);
+      window.removeEventListener('drop', onDrop);
+    };
   }, []);
 }
 
@@ -119,16 +79,11 @@ function SidePanel() {
 
 export function App() {
   useEffect(() => startEngine(), []);
-  useUndoShortcuts();
+  useGlobalInput();
 
   return (
     <div className={styles.shell}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>MarkovJunior Web</h1>
-        <ExamplePicker />
-        <UndoRedo />
-        <span className={styles.version}>engine v{ENGINE_VERSION}</span>
-      </header>
+      <Header />
 
       <aside className={styles.tree} aria-label="Program">
         <details className={styles.symbols} open>

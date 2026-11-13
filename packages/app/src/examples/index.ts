@@ -1,4 +1,6 @@
 import Basic from './Basic.xml?raw';
+import DrunkardsWalk from './DrunkardsWalk.xml?raw';
+import Islands from './Islands.xml?raw';
 import BasicSnake from './BasicSnake.xml?raw';
 import Flowers from './Flowers.xml?raw';
 import Growth from './Growth.xml?raw';
@@ -13,9 +15,14 @@ export interface Example {
   description: string;
   source: string;
   size: number;
+  /** Written for this project, rather than ported from MarkovJunior. */
+  original?: boolean;
 }
 
-/** Programs from MarkovJunior by Maxim Gumin (MIT). Sizes follow its models.xml. */
+/**
+ * Bundled programs. Unless marked `original`, they come from MarkovJunior by
+ * Maxim Gumin (MIT) and their sizes follow its models.xml.
+ */
 export const EXAMPLES: readonly Example[] = [
   {
     id: 'MazeBacktracker',
@@ -65,6 +72,22 @@ export const EXAMPLES: readonly Example[] = [
     description: 'Random growth from a seed cell.',
     source: Growth,
     size: 79,
+  },
+  {
+    id: 'Islands',
+    name: 'Islands',
+    description: 'Islands with sandy shores and forests.',
+    source: Islands,
+    size: 72,
+    original: true,
+  },
+  {
+    id: 'DrunkardsWalk',
+    name: "Drunkard's walk",
+    description: 'A random walker carves out a cave.',
+    source: DrunkardsWalk,
+    size: 64,
+    original: true,
   },
   {
     id: 'Basic',

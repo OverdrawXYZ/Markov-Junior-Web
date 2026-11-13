@@ -15,6 +15,7 @@ import { DEFAULT_EXAMPLE, EXAMPLES } from '../examples';
 import { createEngineClient, type EngineClient } from '../worker/client';
 import { DEFAULT_SPEED_INDEX, SPEEDS, type RunMode, type WorkerToMain } from '../worker/protocol';
 import { frames } from './frames';
+import type { ProjectData } from './persist';
 
 export const MIN_SIZE = 1;
 export const MAX_SIZE = 1024;
@@ -44,6 +45,8 @@ export interface EditOptions {
 }
 
 export type Tab = 'inspector' | 'xml';
+export type Zoom = 'fit' | number;
+export type Dialog = 'gallery' | 'share' | 'shortcuts' | null;
 
 /** An edit may also say what should be selected afterwards. */
 export type EditResult = Program | { program: Program; selection: Selection | null };
@@ -54,6 +57,8 @@ export interface AppState {
   /** The program being edited — the single source of truth. May have validation issues. */
   program: Program | null;
   exampleId: string | null;
+  /** Used for file names when exporting. */
+  name: string;
   /** XML that could not be turned into a program (syntax or structure). */
   parseErrors: Issue[];
   /** Validation issues of `program`, with paths and source lines. */
@@ -65,6 +70,11 @@ export interface AppState {
   /** User colour overrides per symbol (not stored in the XML). */
   palette: Record<string, number>;
   tab: Tab;
+  /** Canvas zoom: 'fit' or a scale factor. */
+  zoom: Zoom;
+  /** The scale 'fit' currently resolves to (reported by the canvas). */
+  fitScale: number;
+  dialog: Dialog;
 
   width: number;
   height: number;
@@ -84,8 +94,17 @@ export interface AppState {
   redo(): void;
   select(selection: Selection | null): void;
   setTab(tab: Tab): void;
+  setZoom(zoom: Zoom): void;
+  setDialog(dialog: Dialog): void;
   setPaletteColor(symbol: string, rgb: number | null): void;
   loadExample(id: string): void;
+  /**
+   * Replace the program with new XML right away (no debounce). `record: false`
+   * starts a fresh history, e.g. when restoring a session.
+   */
+  openSource(source: string, options?: { name?: string; record?: boolean }): void;
+  /** Restore a saved or shared project (program, size, seed, colours). */
+  openProject(project: ProjectData, options?: { name?: string; record?: boolean }): void;
 
   // running
   setSize(width: number, height: number): void;
@@ -218,7 +237,7 @@ export const useApp = create<AppState>()((set, get) => {
     try {
       const parsed = programFromXml(source);
       set({ warnings: parsed.warnings });
-      commit(parsed.program, source, { coalesce: 'xml', ...options });
+      commit(parsed.program, source, options);
     } catch (e) {
       if (!(e instanceof ProgramError)) throw e;
       set({ parseErrors: [...e.issues], warnings: [] });
@@ -234,6 +253,7 @@ export const useApp = create<AppState>()((set, get) => {
     source: DEFAULT_EXAMPLE.source,
     program: null,
     exampleId: DEFAULT_EXAMPLE.id,
+    name: DEFAULT_EXAMPLE.name,
     parseErrors: [],
     issues: [],
     warnings: [],
@@ -242,6 +262,9 @@ export const useApp = create<AppState>()((set, get) => {
     future: [],
     palette: {},
     tab: 'inspector',
+    zoom: 'fit',
+    fitScale: 1,
+    dialog: null,
     width: DEFAULT_EXAMPLE.size,
     height: DEFAULT_EXAMPLE.size,
     seed: randomSeed(),
@@ -257,7 +280,8 @@ export const useApp = create<AppState>()((set, get) => {
       if (parseTimer) clearTimeout(parseTimer);
       parseTimer = setTimeout(() => {
         parseTimer = null;
-        parseSource();
+        // A burst of typing forms one undo step.
+        parseSource({ coalesce: 'xml' });
       }, PARSE_DEBOUNCE_MS);
     },
 
@@ -268,7 +292,7 @@ export const useApp = create<AppState>()((set, get) => {
         // Flush pending XML typing first so it isn't lost or applied afterwards.
         clearTimeout(parseTimer);
         parseTimer = null;
-        parseSource();
+        parseSource({ coalesce: 'xml' });
       }
       const current = get().program!;
       const result = fn(current);
@@ -304,6 +328,8 @@ export const useApp = create<AppState>()((set, get) => {
     },
 
     setTab: (tab) => set({ tab }),
+    setZoom: (zoom) => set({ zoom }),
+    setDialog: (dialog) => set({ dialog }),
 
     setPaletteColor(symbol, rgb) {
       const palette = { ...get().palette };
@@ -315,11 +341,29 @@ export const useApp = create<AppState>()((set, get) => {
     loadExample(id) {
       const example = EXAMPLES.find((e) => e.id === id);
       if (!example) return;
+      set({ width: example.size, height: example.size });
+      get().openSource(example.source, { name: example.name });
+      set({ exampleId: id });
+    },
+
+    openSource(source, { name, record = true } = {}) {
       if (parseTimer) clearTimeout(parseTimer);
       parseTimer = null;
       userPaused = false;
-      set({ source: example.source, exampleId: id, width: example.size, height: example.size });
+      const example = EXAMPLES.find((e) => e.source === source);
+      set({ source, exampleId: example?.id ?? null, name: name ?? example?.name ?? 'Untitled' });
       parseSource({ select: null, immediate: true });
+      if (!record) set({ past: [], future: [] });
+    },
+
+    openProject(project, options = {}) {
+      set({
+        width: project.width,
+        height: project.height,
+        seed: project.seed,
+        palette: project.palette ?? {},
+      });
+      get().openSource(project.source, options);
     },
 
     setSize(width, height) {
@@ -402,18 +446,21 @@ export function startEngine(client: EngineClient = createEngineClient()): () => 
   const unsubscribe = client.subscribe(onEngineMessage);
   const { speedIndex } = useApp.getState();
   client.send({ type: 'setSpeed', stepsPerFrame: SPEEDS[speedIndex]! });
-  const { exampleId, source, program, setSource, loadExample } = useApp.getState();
-  if (program) {
-    useApp.setState({ source });
-    scheduleInitialLoad();
-  } else if (exampleId) loadExample(exampleId);
-  else setSource(source);
+  const { source, program, openSource } = useApp.getState();
+  if (program) scheduleInitialLoad();
+  else openSource(source, { record: false });
   return () => {
     unsubscribe();
     client.dispose();
     if (engine === client) engine = null;
     frames.clear();
   };
+}
+
+/** The current project, as saved and shared. */
+export function currentProject(): ProjectData {
+  const { source, width, height, seed, palette } = useApp.getState();
+  return { source, width, height, seed, ...(Object.keys(palette).length > 0 && { palette }) };
 }
 
 /** Re-send the current program after the engine restarts (e.g. React StrictMode remount). */

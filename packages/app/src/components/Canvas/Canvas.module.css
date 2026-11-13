@@ -13,6 +13,10 @@
   padding: 16px;
 }
 
+.viewport[data-panning] {
+  cursor: grabbing;
+}
+
 .canvas {
   /* margin: auto centres without clipping when the canvas overflows. */
   margin: auto;

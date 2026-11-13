@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from 'react';
 import { ackFrame, effectivePalette, useApp } from '../../store/app';
+import { exportPng } from '../../render/exportPng';
 import { frames, type Frame } from '../../store/frames';
 import { buildLut, paint } from '../../render/paint';
 import { fitScale, zoomIn, zoomOut } from './zoom';
 import styles from './Canvas.module.css';
-
-type Zoom = 'fit' | number;
 
 const nextFrame: (cb: () => void) => void =
   typeof requestAnimationFrame === 'function'
@@ -22,8 +21,12 @@ export function Canvas() {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
-  const [zoom, setZoom] = useState<Zoom>('fit');
-  const [fit, setFit] = useState(1);
+  const zoom = useApp((s) => s.zoom);
+  const setZoom = useApp((s) => s.setZoom);
+  const fit = useApp((s) => s.fitScale);
+  const setFit = (fitScale: number) => useApp.setState({ fitScale });
+  const pan = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+  const [panning, setPanning] = useState(false);
   const [hover, setHover] = useState<Hover | null>(null);
 
   // Draw frames as they arrive, at most once per animation frame.
@@ -124,7 +127,37 @@ export function Canvas() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.viewport} ref={containerRef} onWheel={onWheel}>
+      <div
+        className={styles.viewport}
+        ref={containerRef}
+        onWheel={onWheel}
+        data-panning={panning || undefined}
+        onPointerDown={(e) => {
+          // Drag to pan when the grid is larger than the panel.
+          const el = e.currentTarget;
+          if (
+            e.button !== 0 ||
+            (el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight)
+          )
+            return;
+          el.setPointerCapture?.(e.pointerId);
+          pan.current = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop };
+          setPanning(true);
+        }}
+        onPointerMove={(e) => {
+          if (!pan.current) return;
+          e.currentTarget.scrollLeft = pan.current.left - (e.clientX - pan.current.x);
+          e.currentTarget.scrollTop = pan.current.top - (e.clientY - pan.current.y);
+        }}
+        onPointerUp={() => {
+          pan.current = null;
+          setPanning(false);
+        }}
+        onPointerCancel={() => {
+          pan.current = null;
+          setPanning(false);
+        }}
+      >
         <canvas
           ref={canvasRef}
           className={styles.canvas}
@@ -147,6 +180,14 @@ export function Canvas() {
           )}
         </span>
         <span className={styles.zoom}>
+          <button
+            type="button"
+            onClick={() => void exportPng()}
+            disabled={!dims}
+            title="Save the grid as a PNG image"
+          >
+            PNG
+          </button>
           <button type="button" onClick={() => setZoom(zoomOut(scale))} aria-label="Zoom out">
             −
           </button>

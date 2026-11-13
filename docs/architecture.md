@@ -115,3 +115,28 @@ setSpeed | ack` in; `loaded | error | status | frame` out. Frames carry a transf
   state, not part of the XML (MarkovJunior's format has no colours).
 - **Symmetry preview** uses the engine's `ruleVariants` / `effectiveSymmetry`, which are
   cross-checked in tests against the compiled rules, so the preview always matches what runs.
+
+### Projects, persistence and sharing (phase 5)
+
+A **project** is `{ source, width, height, seed, palette? }` (`store/persist.ts`). Everything
+else (selection, zoom, speed, history) is per-session UI state.
+
+- **Startup** (`store/session.ts → hydrate()`, before the first render): a `#p=…` share link
+  wins, then the localStorage autosave (`mj.project.v1`), then the default example. After a
+  share link is loaded the hash is removed, so a reload continues from the autosave.
+- **Autosave** writes the project 400 ms after it changes, and on `pagehide`. Failures (quota,
+  blocked storage) are ignored rather than surfaced.
+- **Share links** carry the whole project — no server. Format: `#p=` + `z` +
+  base64url(deflate-raw(JSON)), or `j` + base64url(JSON) where `CompressionStream` is missing.
+  Decoded data is untrusted and validated by `asProject()`. **These prefixes and the storage
+  key are a compatibility contract: add new prefixes/keys rather than changing them.**
+- **Open / Save** `.xml` (button, Ctrl+O / Ctrl+S, or drop a file on the page). Opening is an
+  undoable edit; the file name becomes the project name used for downloads.
+- **PNG export** renders the latest frame at an integer scale (longest side ≥ 512 px, ≤ 4096 px)
+  with smoothing off, named `<project>-<seed>.png`.
+- **Gallery thumbnails** are rendered on demand on the main thread with the real engine
+  (seed 1, capped at 20 000 steps), one at a time with yields in between, and cached. Programs
+  that finish as a single colour are shown a third of the way through instead.
+- **Keyboard shortcuts** are defined once in `editor/actions.ts` (`SHORTCUTS`) and drive both
+  the global handler and the help dialog. They're ignored while typing in a field, while a
+  dialog is open, and Space is left to focused buttons.

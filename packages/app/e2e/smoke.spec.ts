@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { loadExample } from './helpers';
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -56,7 +57,7 @@ test('loads, runs the default example in the worker and draws it', async ({ page
 
 test('transport controls drive the run', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('combobox').first().selectOption('River');
+  await loadExample(page, 'River');
   await page.getByRole('button', { name: 'Pause' }).click();
   await page.getByRole('button', { name: 'Reset' }).click();
   await expect(page.getByTestId('step-count')).toHaveText('Step 0');

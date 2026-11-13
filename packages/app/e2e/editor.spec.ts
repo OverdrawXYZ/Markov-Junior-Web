@@ -1,11 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-
-async function xml(page: Page): Promise<string> {
-  await page.getByRole('tab', { name: /XML/ }).click();
-  const value = await page.getByRole('textbox', { name: 'Program XML' }).inputValue();
-  await page.getByRole('tab', { name: 'Inspector' }).click();
-  return value;
-}
+import { loadExample, xml } from './helpers';
 
 function canvasColours(page: Page): Promise<string[]> {
   return page.getByLabel('Grid preview').evaluate((el) => {
@@ -23,7 +17,7 @@ function canvasColours(page: Page): Promise<string[]> {
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('combobox').first().selectOption('Basic');
+  await loadExample(page, 'Basic');
   await expect(page.getByRole('treeitem', { name: 'one' })).toBeVisible();
 });
 

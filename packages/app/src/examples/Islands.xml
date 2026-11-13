@@ -1,0 +1,8 @@
+<!-- Islands: an original example for MarkovJunior Web. -->
+<sequence values="UGYE">
+  <one in="U" out="G" steps="14" comment="scatter island seeds"/>
+  <one in="GU" out="GG" steps="1400" comment="grow the islands"/>
+  <all in="GU" out="Y*" comment="sandy shores"/>
+  <one in="G" out="E" steps="10" comment="plant forests"/>
+  <one in="EG" out="EE" steps="300" comment="grow the forests"/>
+</sequence>

@@ -1,0 +1,49 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 0.45);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(480px, 100%);
+  max-height: calc(100vh - 32px);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.35);
+  outline: none;
+}
+
+.dialog[data-wide] {
+  width: min(960px, 100%);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+}
+
+.close {
+  padding: 0 8px;
+  border-color: transparent;
+  font-size: 18px;
+  line-height: 26px;
+}
+
+.body {
+  padding: 16px;
+  overflow: auto;
+}

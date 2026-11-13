@@ -1,0 +1,5 @@
+<!-- Drunkard's walk: an original example for MarkovJunior Web. -->
+<sequence values="BRW" origin="True">
+  <one in="R*" out="WR" steps="4000" comment="wander, carving a tunnel"/>
+  <all in="R" out="W" comment="drop the walker"/>
+</sequence>
