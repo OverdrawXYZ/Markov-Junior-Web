@@ -1,6 +1,6 @@
 .shell {
   display: grid;
-  grid-template-columns: minmax(220px, 280px) 1fr minmax(280px, 380px);
+  grid-template-columns: minmax(240px, 300px) 1fr minmax(320px, 400px);
   grid-template-rows: auto 1fr auto;
   grid-template-areas:
     'header header header'
@@ -37,6 +37,16 @@
   color: var(--muted);
 }
 
+.history {
+  display: flex;
+  gap: 4px;
+}
+
+.history button {
+  font-size: 12px;
+  padding: 3px 10px;
+}
+
 .version {
   margin-left: auto;
   color: var(--muted);
@@ -61,6 +71,62 @@
   grid-area: inspector;
   display: flex;
   flex-direction: column;
+  padding-top: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 -16px 12px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.tab[aria-selected='true'] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.badge {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: var(--panel);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.tabPanel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.symbols {
+  margin-bottom: 14px;
+}
+
+.symbols > summary {
+  cursor: pointer;
+  list-style-position: outside;
+  margin-left: 12px;
 }
 
 .canvas {

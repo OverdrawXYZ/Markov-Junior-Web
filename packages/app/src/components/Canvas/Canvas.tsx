@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from 'react';
-import { ackFrame } from '../../store/app';
+import { ackFrame, effectivePalette, useApp } from '../../store/app';
 import { frames, type Frame } from '../../store/frames';
 import { buildLut, paint } from '../../render/paint';
 import { fitScale, zoomIn, zoomOut } from './zoom';
@@ -55,9 +55,11 @@ export function Canvas() {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           image ??= ctx.createImageData(frame.width, frame.height);
-          if (!lut || lutFor !== frame.characters) {
-            lut = buildLut(frame.characters);
-            lutFor = frame.characters;
+          const overrides = useApp.getState().palette;
+          const lutKey = frame.characters + JSON.stringify(overrides);
+          if (!lut || lutFor !== lutKey) {
+            lut = buildLut(frame.characters, effectivePalette(overrides));
+            lutFor = lutKey;
           }
           paint(frame.state, lut, new Uint32Array(image.data.buffer));
           ctx.putImageData(image, 0, 0);
@@ -82,6 +84,12 @@ export function Canvas() {
       unsubscribe();
     };
   }, []);
+
+  // Redraw when the user changes a colour.
+  const palette = useApp((s) => s.palette);
+  useEffect(() => {
+    if (frames.latest) frames.publish(frames.latest);
+  }, [palette]);
 
   // Keep the "fit" scale in sync with the panel size.
   useEffect(() => {

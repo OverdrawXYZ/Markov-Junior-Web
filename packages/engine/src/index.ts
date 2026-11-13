@@ -27,6 +27,7 @@ export { programFromXml, programToXml, withLines, pathKey } from './xml';
 export type { XmlParseResult } from './xml';
 
 export { SQUARE_SUBGROUPS, SYMMETRY_NAMES } from './symmetry';
+export { DEFAULT_SYMMETRY, effectiveSymmetry, ruleVariants } from './variants';
 export { parsePattern } from './rule';
 export { MAX_SYMBOLS } from './grid';
 export { DEFAULT_PALETTE, FALLBACK_COLOR, colorOf } from './palette';

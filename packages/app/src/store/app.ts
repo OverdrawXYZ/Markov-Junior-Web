@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import {
+  DEFAULT_PALETTE,
+  nodeAt,
   programFromXml,
+  programToXml,
   ProgramError,
   validateProgram,
   withLines,
@@ -16,16 +19,52 @@ import { frames } from './frames';
 export const MIN_SIZE = 1;
 export const MAX_SIZE = 1024;
 export const PARSE_DEBOUNCE_MS = 300;
+export const LOAD_DEBOUNCE_MS = 120;
+/** Consecutive edits with the same coalesce key within this window form one undo step. */
+export const COALESCE_MS = 1000;
+export const HISTORY_LIMIT = 200;
+
+export interface Selection {
+  path: NodePath;
+  /** Index of the selected rule within a rule node. */
+  rule?: number;
+}
+
+interface Snapshot {
+  program: Program;
+  source: string;
+  selection: Selection | null;
+}
+
+export interface EditOptions {
+  /** Edits sharing a key in quick succession are undone together (e.g. one paint stroke). */
+  coalesce?: string;
+  /** Selection after the edit (default: unchanged, or cleared if it no longer exists). */
+  select?: Selection | null;
+}
+
+export type Tab = 'inspector' | 'xml';
+
+/** An edit may also say what should be selected afterwards. */
+export type EditResult = Program | { program: Program; selection: Selection | null };
 
 export interface AppState {
-  /** XML source being edited. */
+  /** XML text. Mirrors `program`, except while the user is typing invalid XML. */
   source: string;
-  exampleId: string | null;
-  /** Last successfully parsed + validated program (what the engine is running). */
+  /** The program being edited — the single source of truth. May have validation issues. */
   program: Program | null;
-  /** Errors in the current source (empty if it compiled). */
+  exampleId: string | null;
+  /** XML that could not be turned into a program (syntax or structure). */
+  parseErrors: Issue[];
+  /** Validation issues of `program`, with paths and source lines. */
   issues: Issue[];
   warnings: Issue[];
+  selection: Selection | null;
+  past: Snapshot[];
+  future: Snapshot[];
+  /** User colour overrides per symbol (not stored in the XML). */
+  palette: Record<string, number>;
+  tab: Tab;
 
   width: number;
   height: number;
@@ -38,8 +77,17 @@ export interface AppState {
   stepCount: number;
   activeNodePath: NodePath | null;
 
+  // editing
   setSource(source: string): void;
+  edit(fn: (program: Program) => EditResult, options?: EditOptions): void;
+  undo(): void;
+  redo(): void;
+  select(selection: Selection | null): void;
+  setTab(tab: Tab): void;
+  setPaletteColor(symbol: string, rgb: number | null): void;
   loadExample(id: string): void;
+
+  // running
   setSize(width: number, height: number): void;
   setSeed(seed: number): void;
   randomizeSeed(): void;
@@ -58,50 +106,142 @@ export const randomSeed = () => Math.floor(Math.random() * 1_000_000);
 
 let engine: EngineClient | null = null;
 let parseTimer: ReturnType<typeof setTimeout> | null = null;
+let loadTimer: ReturnType<typeof setTimeout> | null = null;
+let lastEdit = { key: '', at: 0 };
+/** Program last sent to the engine, to skip redundant reloads. */
+let loaded: { program: Program; width: number; height: number } | null = null;
+/** Set when the user pauses or steps; edits then don't restart playback. */
+let userPaused = false;
 /** Characters of the loaded grid, needed to interpret frames. */
 let characters = '';
+
+/** Validation issues with source lines (the source is parsed for its line map). */
+function check(program: Program, source: string): Issue[] {
+  const issues = validateProgram(program);
+  if (issues.length === 0) return issues;
+  try {
+    return withLines(issues, programFromXml(source).lines);
+  } catch {
+    return issues;
+  }
+}
+
+/** Keep a selection only if it still points at something. */
+function validSelection(program: Program, selection: Selection | null): Selection | null {
+  if (!selection) return null;
+  const node = nodeAt(program.root, selection.path);
+  if (!node) return null;
+  if (selection.rule === undefined) return selection;
+  return 'rules' in node && node.rules[selection.rule] ? selection : { path: selection.path };
+}
+
+export function effectivePalette(overrides: Record<string, number>): Record<string, number> {
+  return { ...DEFAULT_PALETTE, ...overrides };
+}
 
 export const useApp = create<AppState>()((set, get) => {
   const send: EngineClient['send'] = (msg) => engine?.send(msg);
 
-  /** Parse + validate the current source; load it into the engine if valid. */
-  const compile = (resume: boolean) => {
+  /** Send the current program to the engine (debounced) if it is valid. */
+  const scheduleLoad = (immediate = false) => {
+    if (loadTimer) clearTimeout(loadTimer);
+    loadTimer = null;
+    const run = () => {
+      loadTimer = null;
+      const { program, issues, width, height, seed } = get();
+      if (!program || issues.length > 0) return;
+      if (
+        loaded &&
+        loaded.program === program &&
+        loaded.width === width &&
+        loaded.height === height
+      )
+        return;
+      loaded = { program, width, height };
+      send({ type: 'load', program, width, height, seed });
+      if (!userPaused) send({ type: 'play' });
+    };
+    if (immediate) run();
+    else loadTimer = setTimeout(run, LOAD_DEBOUNCE_MS);
+  };
+
+  /** Make `program` current, recording the previous state for undo. */
+  const commit = (
+    program: Program,
+    source: string,
+    options: EditOptions & { immediate?: boolean } = {},
+  ) => {
+    const s = get();
+    const now = Date.now();
+    const coalesce =
+      options.coalesce !== undefined &&
+      options.coalesce === lastEdit.key &&
+      now - lastEdit.at < COALESCE_MS;
+    lastEdit = { key: options.coalesce ?? '', at: now };
+    const past =
+      s.program && !coalesce
+        ? [...s.past, { program: s.program, source: s.source, selection: s.selection }].slice(
+            -HISTORY_LIMIT,
+          )
+        : s.past;
+    const selection = validSelection(
+      program,
+      options.select !== undefined ? options.select : s.selection,
+    );
+    set({
+      program,
+      source,
+      parseErrors: [],
+      issues: check(program, source),
+      selection,
+      past,
+      future: [],
+    });
+    scheduleLoad(options.immediate);
+  };
+
+  const restore = (snap: Snapshot) => {
+    lastEdit = { key: '', at: 0 };
+    set({
+      program: snap.program,
+      source: snap.source,
+      parseErrors: [],
+      issues: check(snap.program, snap.source),
+      selection: validSelection(snap.program, snap.selection),
+    });
+    scheduleLoad(true);
+  };
+
+  /** Parse the XML text; on success it becomes the program. */
+  const parseSource = (options: EditOptions & { immediate?: boolean } = {}) => {
     const { source } = get();
-    let program: Program;
-    let warnings: Issue[];
     try {
       const parsed = programFromXml(source);
-      const issues = withLines(validateProgram(parsed.program), parsed.lines);
-      warnings = parsed.warnings;
-      if (issues.length > 0) {
-        set({ issues, warnings });
-        return;
-      }
-      program = parsed.program;
+      set({ warnings: parsed.warnings });
+      commit(parsed.program, source, { coalesce: 'xml', ...options });
     } catch (e) {
       if (!(e instanceof ProgramError)) throw e;
-      set({ issues: [...e.issues], warnings: [] });
-      return;
+      set({ parseErrors: [...e.issues], warnings: [] });
     }
-    set({ program, issues: [], warnings });
-    load(resume);
   };
 
-  const load = (resume: boolean) => {
-    const { program, width, height, seed } = get();
-    if (!program) return;
-    send({ type: 'load', program, width, height, seed });
-    if (resume) send({ type: 'play' });
+  const snapshot = (): Snapshot => {
+    const { program, source, selection } = get();
+    return { program: program!, source, selection };
   };
-
-  const isRunning = () => get().mode !== 'paused';
 
   return {
     source: DEFAULT_EXAMPLE.source,
-    exampleId: DEFAULT_EXAMPLE.id,
     program: null,
+    exampleId: DEFAULT_EXAMPLE.id,
+    parseErrors: [],
     issues: [],
     warnings: [],
+    selection: null,
+    past: [],
+    future: [],
+    palette: {},
+    tab: 'inspector',
     width: DEFAULT_EXAMPLE.size,
     height: DEFAULT_EXAMPLE.size,
     seed: randomSeed(),
@@ -117,21 +257,74 @@ export const useApp = create<AppState>()((set, get) => {
       if (parseTimer) clearTimeout(parseTimer);
       parseTimer = setTimeout(() => {
         parseTimer = null;
-        compile(isRunning());
+        parseSource();
       }, PARSE_DEBOUNCE_MS);
+    },
+
+    edit(fn, options = {}) {
+      const { program } = get();
+      if (!program) return;
+      if (parseTimer) {
+        // Flush pending XML typing first so it isn't lost or applied afterwards.
+        clearTimeout(parseTimer);
+        parseTimer = null;
+        parseSource();
+      }
+      const current = get().program!;
+      const result = fn(current);
+      const next = 'root' in result ? result : result.program;
+      const opts = 'root' in result ? options : { ...options, select: result.selection };
+      if (next === current) {
+        if (opts.select !== undefined) get().select(opts.select);
+        return;
+      }
+      set({ exampleId: null, warnings: [] });
+      commit(next, programToXml(next), opts);
+    },
+
+    undo() {
+      const { past, future, program } = get();
+      const prev = past[past.length - 1];
+      if (!prev || !program) return;
+      set({ past: past.slice(0, -1), future: [snapshot(), ...future] });
+      restore(prev);
+    },
+
+    redo() {
+      const { past, future, program } = get();
+      const next = future[0];
+      if (!next || !program) return;
+      set({ past: [...past, snapshot()], future: future.slice(1) });
+      restore(next);
+    },
+
+    select(selection) {
+      const { program } = get();
+      set({ selection: program ? validSelection(program, selection) : null });
+    },
+
+    setTab: (tab) => set({ tab }),
+
+    setPaletteColor(symbol, rgb) {
+      const palette = { ...get().palette };
+      if (rgb === null) delete palette[symbol];
+      else palette[symbol] = rgb;
+      set({ palette });
     },
 
     loadExample(id) {
       const example = EXAMPLES.find((e) => e.id === id);
       if (!example) return;
       if (parseTimer) clearTimeout(parseTimer);
+      parseTimer = null;
+      userPaused = false;
       set({ source: example.source, exampleId: id, width: example.size, height: example.size });
-      compile(true);
+      parseSource({ select: null, immediate: true });
     },
 
     setSize(width, height) {
       set({ width: clampSize(width), height: clampSize(height) });
-      load(isRunning());
+      scheduleLoad(true);
     },
 
     setSeed(seed) {
@@ -153,11 +346,23 @@ export const useApp = create<AppState>()((set, get) => {
       set({ stepSize: Math.max(1, Math.round(n) || 1) });
     },
 
-    play: () => send({ type: 'play' }),
-    pause: () => send({ type: 'pause' }),
-    togglePlay: () => (isRunning() ? get().pause() : get().play()),
-    step: () => send({ type: 'step', count: get().stepSize }),
-    runToEnd: () => send({ type: 'runToEnd' }),
+    play() {
+      userPaused = false;
+      send({ type: 'play' });
+    },
+    pause() {
+      userPaused = true;
+      send({ type: 'pause' });
+    },
+    togglePlay: () => (get().mode !== 'paused' ? get().pause() : get().play()),
+    step() {
+      userPaused = true;
+      send({ type: 'step', count: get().stepSize });
+    },
+    runToEnd() {
+      userPaused = false;
+      send({ type: 'runToEnd' });
+    },
     reset: () => send({ type: 'reset' }),
   };
 });
@@ -192,11 +397,16 @@ function onEngineMessage(msg: WorkerToMain): void {
 /** Start the engine and load the initial program. Returns a cleanup function. */
 export function startEngine(client: EngineClient = createEngineClient()): () => void {
   engine = client;
+  loaded = null;
+  userPaused = false;
   const unsubscribe = client.subscribe(onEngineMessage);
   const { speedIndex } = useApp.getState();
   client.send({ type: 'setSpeed', stepsPerFrame: SPEEDS[speedIndex]! });
-  const { exampleId, source, setSource, loadExample } = useApp.getState();
-  if (exampleId) loadExample(exampleId);
+  const { exampleId, source, program, setSource, loadExample } = useApp.getState();
+  if (program) {
+    useApp.setState({ source });
+    scheduleInitialLoad();
+  } else if (exampleId) loadExample(exampleId);
   else setSource(source);
   return () => {
     unsubscribe();
@@ -204,6 +414,15 @@ export function startEngine(client: EngineClient = createEngineClient()): () => 
     if (engine === client) engine = null;
     frames.clear();
   };
+}
+
+/** Re-send the current program after the engine restarts (e.g. React StrictMode remount). */
+function scheduleInitialLoad(): void {
+  const { program, issues, width, height, seed } = useApp.getState();
+  if (!program || issues.length > 0 || !engine) return;
+  loaded = { program, width, height };
+  engine.send({ type: 'load', program, width, height, seed });
+  engine.send({ type: 'play' });
 }
 
 /** Tell the engine the latest frame has been drawn. */

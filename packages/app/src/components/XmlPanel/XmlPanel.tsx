@@ -47,7 +47,9 @@ function IssueList({
 
 export function XmlPanel() {
   const source = useApp((s) => s.source);
-  const issues = useApp((s) => s.issues);
+  const parseErrors = useApp((s) => s.parseErrors);
+  const validationIssues = useApp((s) => s.issues);
+  const issues = parseErrors.length > 0 ? parseErrors : validationIssues;
   const warnings = useApp((s) => s.warnings);
   const setSource = useApp((s) => s.setSource);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -69,7 +71,11 @@ export function XmlPanel() {
       <IssueList issues={issues} kind="error" onSelect={onSelect} />
       <IssueList issues={warnings} kind="warning" onSelect={onSelect} />
       {issues.length > 0 && (
-        <p className={styles.hint}>The preview keeps running the last valid version.</p>
+        <p className={styles.hint}>
+          {parseErrors.length > 0
+            ? 'The visual editor shows the last version that parsed. Editing there replaces this text.'
+            : 'The preview keeps running the last valid version.'}
+        </p>
       )}
     </div>
   );

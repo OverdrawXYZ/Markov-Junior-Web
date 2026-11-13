@@ -9,6 +9,25 @@ function collectErrors(page: Page): string[] {
   return errors;
 }
 
+/**
+ * Canvas contents once the run has halted and the last frame is drawn. The
+ * "Halted" status can arrive an animation frame before the final picture.
+ */
+async function settledCanvas(page: Page): Promise<string> {
+  await expect(page.getByText('Halted')).toBeVisible({ timeout: 15_000 });
+  const read = () =>
+    page.getByLabel('Grid preview').evaluate((el) => (el as HTMLCanvasElement).toDataURL());
+  let previous = await read();
+  for (;;) {
+    await page.evaluate(
+      () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+    );
+    const current = await read();
+    if (current === previous) return current;
+    previous = current;
+  }
+}
+
 /** Number of distinct colours on the preview canvas. */
 function canvasColours(page: Page): Promise<number> {
   return page.getByLabel('Grid preview').evaluate((el) => {
@@ -29,6 +48,7 @@ test('loads, runs the default example in the worker and draws it', async ({ page
   await expect(page.getByText('Halted')).toBeVisible({ timeout: 15_000 });
   // 59×59 maze backtracker: 840 moves forward, 840 back, 1 halting turn — for any seed.
   await expect(page.getByTestId('step-count')).toHaveText('Step 1,681');
+  await settledCanvas(page);
   // Black walls, white corridors and the red cursor.
   expect(await canvasColours(page)).toBe(3);
   expect(errors).toEqual([]);
@@ -36,7 +56,7 @@ test('loads, runs the default example in the worker and draws it', async ({ page
 
 test('transport controls drive the run', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('combobox').selectOption('River');
+  await page.getByRole('combobox').first().selectOption('River');
   await page.getByRole('button', { name: 'Pause' }).click();
   await page.getByRole('button', { name: 'Reset' }).click();
   await expect(page.getByTestId('step-count')).toHaveText('Step 0');
@@ -45,23 +65,17 @@ test('transport controls drive the run', async ({ page }) => {
   await page.getByRole('button', { name: 'Step', exact: true }).click();
   await expect(page.getByTestId('step-count')).toHaveText('Step 10');
   await page.getByRole('button', { name: 'Run to end' }).click();
-  await expect(page.getByText('Halted')).toBeVisible({ timeout: 15_000 });
 
   // Same seed ⇒ same picture.
+  const first = await settledCanvas(page);
   const seed = await page.getByRole('spinbutton', { name: 'Seed' }).inputValue();
-  const first = await page
-    .getByLabel('Grid preview')
-    .evaluate((el) => (el as HTMLCanvasElement).toDataURL());
   await page.getByRole('spinbutton', { name: 'Seed' }).fill(String(Number(seed) + 1));
   await page.getByRole('spinbutton', { name: 'Seed' }).press('Enter');
   await page.getByRole('spinbutton', { name: 'Seed' }).fill(seed);
   await page.getByRole('spinbutton', { name: 'Seed' }).press('Enter');
+  await expect(page.getByTestId('step-count')).toHaveText('Step 0');
   await page.getByRole('button', { name: 'Run to end' }).click();
-  await expect(page.getByText('Halted')).toBeVisible({ timeout: 15_000 });
-  const again = await page
-    .getByLabel('Grid preview')
-    .evaluate((el) => (el as HTMLCanvasElement).toDataURL());
-  expect(again).toBe(first);
+  expect(await settledCanvas(page)).toBe(first);
 });
 
 test('resizing the grid reloads the program', async ({ page }) => {
@@ -78,6 +92,7 @@ test('resizing the grid reloads the program', async ({ page }) => {
 
 test('XML errors are reported and the last valid program keeps running', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('tab', { name: /XML/ }).click();
   const editor = page.getByRole('textbox', { name: 'Program XML' });
   await editor.fill('<markov values="BW">\n  <one in="B" out="Z"/>\n</markov>');
   await expect(page.getByRole('list', { name: 'Errors' })).toContainText(
@@ -87,7 +102,7 @@ test('XML errors are reported and the last valid program keeps running', async (
 
   await editor.fill('<one values="BW" in="B" out="W"/>');
   await expect(page.getByRole('list', { name: 'Errors' })).toHaveCount(0);
-  await expect(page.getByRole('list', { name: 'Program tree' })).toContainText('one');
+  await expect(page.getByRole('tree', { name: 'Program tree' })).toContainText('one');
 });
 
 test('fits a phone screen without horizontal scrolling', async ({ page }) => {

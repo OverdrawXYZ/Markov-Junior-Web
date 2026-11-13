@@ -1,5 +1,4 @@
-import { colorOf } from '@mj/engine';
-import { hex } from '../../render/paint';
+import { useColor } from '../../hooks/usePalette';
 import styles from './PatternView.module.css';
 
 interface Props {
@@ -11,6 +10,7 @@ interface Props {
 
 /** A rule pattern drawn as a small grid of coloured cells. */
 export function PatternView({ pattern, values, label }: Props) {
+  const color = useColor();
   const rows = pattern.split('/');
   const width = Math.max(...rows.map((r) => r.length));
   return (
@@ -26,9 +26,7 @@ export function PatternView({ pattern, values, label }: Props) {
           const key = `${x},${y}`;
           if (ch === '*') return <span key={key} className={`${styles.cell} ${styles.wildcard}`} />;
           if (values.includes(ch)) {
-            return (
-              <span key={key} className={styles.cell} style={{ background: hex(colorOf(ch)) }} />
-            );
+            return <span key={key} className={styles.cell} style={{ background: color(ch) }} />;
           }
           return (
             <span key={key} className={`${styles.cell} ${styles.union}`}>

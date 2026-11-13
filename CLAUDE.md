@@ -81,13 +81,14 @@ source (`Interpreter.cs`, `RuleNode.cs`, `OneNode.cs`, `AllNode.cs`, `ParallelNo
 │       │   ├── worker/         # engine worker entry + message protocol
 │       │   ├── components/
 │       │   │   ├── Canvas/         # grid renderer, zoom, hover readout
-│       │   │   ├── ProgramOutline/ # read-only tree + active node (phase 3; NodeTree replaces it)
+│       │   │   ├── NodeTree/       # program tree: select, add, drag/drop, keyboard
+│       │   │   ├── Inspector/      # selected node's properties + rules list
+│       │   │   ├── RuleEditor/     # paint in/out patterns, resize, symmetry preview, p
+│       │   │   ├── Palette/        # symbols, colours, unions, origin
 │       │   │   ├── PatternView/    # a rule pattern as a tiny colour grid
-│       │   │   ├── RuleEditor/     # visual in/out pattern painter (phase 4)
-│       │   │   ├── NodeTree/       # program tree: add/reorder/nest nodes (phase 4)
-│       │   │   ├── Palette/        # symbol alphabet + colours (phase 4)
 │       │   │   ├── Transport/      # run / pause / step / reset / speed / seed / size
 │       │   │   └── XmlPanel/       # XML editor + inline errors
+│       │   ├── editor/         # pure AST edit operations (ops.ts) + UI labels
 │       │   ├── render/         # palette LUT + ImageData painting
 │       │   ├── store/          # Zustand store (app.ts) + frames bus (frames.ts)
 │       │   └── examples/       # bundled sample programs (MIT, attributed)
@@ -149,7 +150,7 @@ Layout: left = **program tree**, centre = **canvas preview**, right = **inspecto
 2. ✅ **Engine MVP** — grid, rules, wildcards, unions, 2D symmetry, `one`, `all`, `prl`,
    `markov`, `sequence`, `steps`, seeded RNG, XML import. Golden tests vs. known outputs.
 3. ✅ **Preview MVP** — worker + canvas + transport; load a program from XML and watch it run.
-4. **Visual editor** — palette, node tree, rule painter, inspector, two-way XML sync.
+4. ✅ **Visual editor** — palette, node tree, rule painter, inspector, two-way XML sync.
 5. **Polish** — examples gallery, persistence, share URLs, PNG export, keyboard shortcuts.
 6. **Advanced engine** — `field`s/temperature, `observe` + search, `map`, `path`,
    `convolution`, `convchain`, `wfc`.
@@ -176,7 +177,12 @@ Notes:
 - Golden tests (`packages/engine/test/golden.test.ts`) snapshot program + seed → grid hash.
   If engine behaviour changes **intentionally**, update with
   `npx vitest run -u --root packages/engine` and say why in the commit message.
-- Engine and app design (worker protocol, back-pressure, rendering): `docs/architecture.md`.
+- Engine and app design (worker protocol, back-pressure, rendering, editor sync and undo):
+  `docs/architecture.md`.
+- All program edits from the UI go through `packages/app/src/editor/ops.ts` (pure, tested) and
+  `useApp().edit(fn, { coalesce })`. Don't mutate the AST in components.
+- Zustand selectors must return stable values: select the raw array/object and derive in the
+  component. A selector that returns a new array (e.g. `s.issues.filter(...)`) loops forever.
 
 - The app imports the engine from source (`@mj/engine` → `packages/engine/src/index.ts`);
   there is no separate engine build step.

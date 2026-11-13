@@ -79,3 +79,39 @@ setSpeed | ack` in; `loaded | error | status | frame` out. Frames carry a transf
 - **Testing without workers.** `createEngineClient()` falls back to running `EngineHost`
   in-process when `Worker` is undefined (jsdom), so component tests exercise the real engine
   and protocol. `EngineHost` itself is tested with a fake scheduler.
+
+### Visual editor (phase 4)
+
+```
+ NodeTree / Inspector / RuleEditor / PalettePanel            XmlPanel
+        │ edit(fn)                                              │ setSource(text)
+        ▼                                                       ▼ (debounced parse)
+  editor/ops.ts — pure AST operations               programFromXml(text)
+        │                                                       │
+        └──────────────► store.program (the AST) ◄──────────────┘
+                              │   validateProgram → issues (path, rule, line)
+                              │   programToXml → source   (only for visual edits)
+                              ▼
+                     engine load (debounced, valid programs only)
+```
+
+- **The AST is the source of truth.** Visual edits go through pure functions in
+  `editor/ops.ts` (insert/move/wrap/unwrap nodes, rule CRUD, pattern painting, symbol
+  rename/reorder, unions). The XML text is regenerated from the AST after each visual edit.
+- **XML edits** are parsed after 300 ms. If the text parses, it becomes the AST _without being
+  reformatted_. If it doesn't parse, the AST keeps its last parsed version and the XML panel
+  shows the syntax errors; a visual edit at that point replaces the broken text.
+- **Invalid but parseable** programs are still shown and editable in the tree, with error
+  badges; only valid programs are sent to the engine, so the preview keeps running the last
+  valid one.
+- **Undo/redo** stores `{program, source, selection}` snapshots (200 deep). Edits sharing a
+  `coalesce` key within 1 s form one step — a whole paint stroke, a typed comment, a slider
+  drag, or a burst of XML typing.
+- **Edits return the selection they want** (`{ program, selection }`) so it is validated
+  against the _new_ tree.
+- **Live coding.** Each valid edit reloads the engine (debounced 120 ms) and keeps playing
+  unless the user explicitly paused or stepped.
+- **Colours** are per-symbol overrides on top of MarkovJunior's default palette. They are app
+  state, not part of the XML (MarkovJunior's format has no colours).
+- **Symmetry preview** uses the engine's `ruleVariants` / `effectiveSymmetry`, which are
+  cross-checked in tests against the compiled rules, so the preview always matches what runs.
