@@ -1,0 +1,57 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`golden outputs > Basic at size 60 1`] = `
+{
+  "hash": "0a1f0a15",
+  "steps": 3601,
+}
+`;
+
+exports[`golden outputs > BasicSnake at size 23 1`] = `
+{
+  "hash": "077e7172",
+  "steps": 100,
+}
+`;
+
+exports[`golden outputs > Flowers at size 60 1`] = `
+{
+  "hash": "182b1eac",
+  "steps": 313,
+}
+`;
+
+exports[`golden outputs > Growth at size 59 1`] = `
+{
+  "hash": "14036874",
+  "steps": 3481,
+}
+`;
+
+exports[`golden outputs > MazeBacktracker at size 59 1`] = `
+{
+  "hash": "0cb2196c",
+  "steps": 1681,
+}
+`;
+
+exports[`golden outputs > MazeGrowth at size 59 1`] = `
+{
+  "hash": "f9fa7080",
+  "steps": 841,
+}
+`;
+
+exports[`golden outputs > NystromDungeon at size 39 1`] = `
+{
+  "hash": "58434257",
+  "steps": 521,
+}
+`;
+
+exports[`golden outputs > River at size 80 1`] = `
+{
+  "hash": "850143bb",
+  "steps": 12365,
+}
+`;
