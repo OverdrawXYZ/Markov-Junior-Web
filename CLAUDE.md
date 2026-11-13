@@ -43,18 +43,18 @@ source (`Interpreter.cs`, `RuleNode.cs`, `OneNode.cs`, `AllNode.cs`, `ParallelNo
 
 ## Tech stack
 
-| Concern        | Choice                                                         |
-| -------------- | -------------------------------------------------------------- |
-| Language       | TypeScript (strict mode)                                       |
-| Build / dev    | Vite                                                           |
-| UI             | React 18 + Zustand for app state                               |
-| Styling        | CSS modules (or Tailwind if adopted — pick one, don't mix)     |
-| Rendering      | `<canvas>` 2D with `ImageData`; WebGL only if profiling demands |
-| Engine runtime | Dedicated Web Worker, messages via a typed protocol (Comlink ok) |
-| XML            | `DOMParser` in the browser; `@xmldom/xmldom` shim in Node tests |
-| Tests          | Vitest (engine unit + golden tests), Playwright (UI smoke)     |
-| Lint / format  | ESLint + Prettier                                              |
-| Package mgr    | npm                                                            |
+| Concern        | Choice                                                                              |
+| -------------- | ----------------------------------------------------------------------------------- |
+| Language       | TypeScript 6.0 (strict) — pinned `~6.0`; typescript-eslint doesn't support TS 7 yet |
+| Build / dev    | Vite                                                                                |
+| UI             | React 19 + Zustand for app state                                                    |
+| Styling        | CSS modules (or Tailwind if adopted — pick one, don't mix)                          |
+| Rendering      | `<canvas>` 2D with `ImageData`; WebGL only if profiling demands                     |
+| Engine runtime | Dedicated Web Worker, messages via a typed protocol (Comlink ok)                    |
+| XML            | `DOMParser` in the browser; `@xmldom/xmldom` shim in Node tests                     |
+| Tests          | Vitest (engine unit + golden tests), Playwright (UI smoke)                          |
+| Lint / format  | ESLint + Prettier                                                                   |
+| Package mgr    | npm workspaces (`@mj/engine`, `@mj/app`), Node 22 (`.nvmrc`)                        |
 
 ## Repository layout (target)
 
@@ -142,7 +142,7 @@ Layout: left = **program tree**, centre = **canvas preview**, right = **inspecto
 
 ## Roadmap
 
-1. **Scaffold** — workspaces, Vite app, Vitest, ESLint/Prettier, CI (lint + typecheck + test).
+1. ✅ **Scaffold** — workspaces, Vite app, Vitest, ESLint/Prettier, CI (lint + typecheck + test).
 2. **Engine MVP** — grid, rules, wildcards, unions, 2D symmetry, `one`, `all`, `prl`,
    `markov`, `sequence`, `steps`, seeded RNG, XML import. Golden tests vs. known outputs.
 3. **Preview MVP** — worker + canvas + transport; load a program from XML and watch it run.
@@ -154,7 +154,7 @@ Layout: left = **program tree**, centre = **canvas preview**, right = **inspecto
 
 Work through phases in order; each phase should leave `main` in a working, tested state.
 
-## Commands (once scaffolded)
+## Commands
 
 ```bash
 npm install
@@ -166,7 +166,16 @@ npm run lint         # ESLint
 npm run typecheck    # tsc --noEmit across workspaces
 ```
 
-Run `npm run lint && npm run typecheck && npm test` before every commit.
+Run `npm run lint && npm run format:check && npm run typecheck && npm test` before every commit.
+
+Notes:
+
+- The app imports the engine from source (`@mj/engine` → `packages/engine/src/index.ts`);
+  there is no separate engine build step.
+- ESLint enforces engine purity: no React/zustand/app imports, no `window`/`document`,
+  no `Math.random` in `packages/engine`.
+- Playwright is pinned to the version matching the locally installed browsers; e2e runs
+  against `vite preview` on port 4173 (see `packages/app/playwright.config.ts`).
 
 ## Conventions
 
