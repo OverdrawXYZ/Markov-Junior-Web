@@ -1,0 +1,84 @@
+.shell {
+  display: grid;
+  grid-template-columns: 260px 1fr 300px;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    'header header header'
+    'tree canvas inspector'
+    'transport transport transport';
+  height: 100%;
+  gap: 1px;
+  background: var(--border);
+}
+
+.header {
+  grid-area: header;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--panel);
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.version {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tree,
+.inspector,
+.canvas,
+.transport {
+  background: var(--panel);
+  padding: 12px 16px;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.tree {
+  grid-area: tree;
+}
+
+.inspector {
+  grid-area: inspector;
+}
+
+.canvas {
+  grid-area: canvas;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+}
+
+.transport {
+  grid-area: transport;
+}
+
+.panelTitle {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.placeholder {
+  margin: 0;
+  color: var(--muted);
+}
+
+@media (max-width: 800px) {
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr auto auto;
+    grid-template-areas: 'header' 'tree' 'canvas' 'inspector' 'transport';
+  }
+}

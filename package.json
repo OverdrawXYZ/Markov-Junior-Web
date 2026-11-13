@@ -1,0 +1,30 @@
+{
+  "name": "markov-junior-web",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/engine",
+    "packages/app"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @mj/app",
+    "build": "npm run build -w @mj/engine && npm run build -w @mj/app",
+    "test": "npm test --workspaces",
+    "test:e2e": "npm run test:e2e -w @mj/app",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run typecheck --workspaces"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.14.0",
+    "prettier": "^3.10.1",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.2"
+  }
+}
