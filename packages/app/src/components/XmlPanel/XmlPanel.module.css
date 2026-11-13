@@ -1,0 +1,77 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+}
+
+.editor {
+  flex: 1;
+  min-height: 160px;
+  width: 100%;
+  resize: none;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 18px;
+  tab-size: 2;
+  white-space: pre;
+  overflow: auto;
+}
+
+.editor:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.editor[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.issues {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 30%;
+  overflow: auto;
+  font-size: 12px;
+}
+
+.issue {
+  display: block;
+  width: 100%;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  text-align: left;
+  font: inherit;
+  background: transparent;
+  color: inherit;
+}
+
+button.issue {
+  cursor: pointer;
+}
+
+button.issue:hover {
+  background: var(--chip);
+}
+
+.issues[data-kind='error'] {
+  color: var(--danger);
+}
+
+.issues[data-kind='warning'] {
+  color: var(--warning);
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}

@@ -80,14 +80,17 @@ source (`Interpreter.cs`, `RuleNode.cs`, `OneNode.cs`, `AllNode.cs`, `ParallelNo
 │       ├── src/
 │       │   ├── worker/         # engine worker entry + message protocol
 │       │   ├── components/
-│       │   │   ├── Canvas/         # grid renderer, zoom/pan, pixel-perfect scaling
-│       │   │   ├── RuleEditor/     # visual in/out pattern painter
-│       │   │   ├── NodeTree/       # program tree: add/reorder/nest nodes
-│       │   │   ├── Palette/        # symbol alphabet + colours
-│       │   │   ├── Transport/      # run / pause / step / reset / speed / seed
-│       │   │   └── XmlPanel/       # code view, two-way synced with the tree
-│       │   ├── store/          # Zustand stores (program, run state, ui)
-│       │   └── examples/       # bundled sample programs
+│       │   │   ├── Canvas/         # grid renderer, zoom, hover readout
+│       │   │   ├── ProgramOutline/ # read-only tree + active node (phase 3; NodeTree replaces it)
+│       │   │   ├── PatternView/    # a rule pattern as a tiny colour grid
+│       │   │   ├── RuleEditor/     # visual in/out pattern painter (phase 4)
+│       │   │   ├── NodeTree/       # program tree: add/reorder/nest nodes (phase 4)
+│       │   │   ├── Palette/        # symbol alphabet + colours (phase 4)
+│       │   │   ├── Transport/      # run / pause / step / reset / speed / seed / size
+│       │   │   └── XmlPanel/       # XML editor + inline errors
+│       │   ├── render/         # palette LUT + ImageData painting
+│       │   ├── store/          # Zustand store (app.ts) + frames bus (frames.ts)
+│       │   └── examples/       # bundled sample programs (MIT, attributed)
 │       └── e2e/
 └── docs/
     ├── deviations.md
@@ -145,7 +148,7 @@ Layout: left = **program tree**, centre = **canvas preview**, right = **inspecto
 1. ✅ **Scaffold** — workspaces, Vite app, Vitest, ESLint/Prettier, CI (lint + typecheck + test).
 2. ✅ **Engine MVP** — grid, rules, wildcards, unions, 2D symmetry, `one`, `all`, `prl`,
    `markov`, `sequence`, `steps`, seeded RNG, XML import. Golden tests vs. known outputs.
-3. **Preview MVP** — worker + canvas + transport; load a program from XML and watch it run.
+3. ✅ **Preview MVP** — worker + canvas + transport; load a program from XML and watch it run.
 4. **Visual editor** — palette, node tree, rule painter, inspector, two-way XML sync.
 5. **Polish** — examples gallery, persistence, share URLs, PNG export, keyboard shortcuts.
 6. **Advanced engine** — `field`s/temperature, `observe` + search, `map`, `path`,
@@ -173,7 +176,7 @@ Notes:
 - Golden tests (`packages/engine/test/golden.test.ts`) snapshot program + seed → grid hash.
   If engine behaviour changes **intentionally**, update with
   `npx vitest run -u --root packages/engine` and say why in the commit message.
-- Engine design, module map and execution model: `docs/architecture.md`.
+- Engine and app design (worker protocol, back-pressure, rendering): `docs/architecture.md`.
 
 - The app imports the engine from source (`@mj/engine` → `packages/engine/src/index.ts`);
   there is no separate engine build step.

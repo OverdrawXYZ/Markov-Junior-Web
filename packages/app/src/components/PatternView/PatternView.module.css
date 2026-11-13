@@ -1,0 +1,27 @@
+.grid {
+  --cell: 10px;
+  display: inline-grid;
+  gap: 1px;
+  padding: 1px;
+  background: var(--border);
+  vertical-align: middle;
+}
+
+.cell {
+  width: var(--cell);
+  height: var(--cell);
+  display: grid;
+  place-items: center;
+}
+
+.wildcard {
+  background: repeating-linear-gradient(45deg, var(--panel) 0 2px, var(--chip) 2px 4px);
+}
+
+.union {
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 8px;
+  line-height: 1;
+}
