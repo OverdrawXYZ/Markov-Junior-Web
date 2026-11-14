@@ -17,7 +17,9 @@ TypeScript for the browser.
 
 ## Getting started
 
-Requires Node 22.
+Requires **Node 22.22.2 or newer** (or Node 24.15+). Check with `node -v`; with nvm, run
+`nvm install` in the repo (it reads `.nvmrc`). Older versions give "unsupported engine"
+warnings during `npm install` and the tests may fail.
 
 ```bash
 npm install

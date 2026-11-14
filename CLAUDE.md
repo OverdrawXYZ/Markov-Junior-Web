@@ -43,18 +43,18 @@ source (`Interpreter.cs`, `RuleNode.cs`, `OneNode.cs`, `AllNode.cs`, `ParallelNo
 
 ## Tech stack
 
-| Concern        | Choice                                                                              |
-| -------------- | ----------------------------------------------------------------------------------- |
-| Language       | TypeScript 6.0 (strict) — pinned `~6.0`; typescript-eslint doesn't support TS 7 yet |
-| Build / dev    | Vite                                                                                |
-| UI             | React 19 + Zustand for app state                                                    |
-| Styling        | CSS modules (or Tailwind if adopted — pick one, don't mix)                          |
-| Rendering      | `<canvas>` 2D with `ImageData`; WebGL only if profiling demands                     |
-| Engine runtime | Dedicated Web Worker, messages via a typed protocol (Comlink ok)                    |
-| XML            | Small in-house parser in the engine (`DOMParser` doesn't exist in Web Workers)      |
-| Tests          | Vitest (engine unit + golden tests), Playwright (UI smoke)                          |
-| Lint / format  | ESLint + Prettier                                                                   |
-| Package mgr    | npm workspaces (`@mj/engine`, `@mj/app`), Node 22 (`.nvmrc`)                        |
+| Concern        | Choice                                                                                    |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| Language       | TypeScript 6.0 (strict) — pinned `~6.0`; typescript-eslint doesn't support TS 7 yet       |
+| Build / dev    | Vite                                                                                      |
+| UI             | React 19 + Zustand for app state                                                          |
+| Styling        | CSS modules (or Tailwind if adopted — pick one, don't mix)                                |
+| Rendering      | `<canvas>` 2D with `ImageData`; WebGL only if profiling demands                           |
+| Engine runtime | Dedicated Web Worker, messages via a typed protocol (Comlink ok)                          |
+| XML            | Small in-house parser in the engine (`DOMParser` doesn't exist in Web Workers)            |
+| Tests          | Vitest (engine unit + golden tests), Playwright (UI smoke)                                |
+| Lint / format  | ESLint + Prettier                                                                         |
+| Package mgr    | npm workspaces (`@mj/engine`, `@mj/app`), Node ≥ 22.22.2 or ≥ 24.15 (`.nvmrc`, `engines`) |
 
 ## Repository layout (target)
 
