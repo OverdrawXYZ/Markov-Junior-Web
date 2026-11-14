@@ -9,6 +9,7 @@ import {
   type FieldDef,
   type MapNodeDef,
   type MapRuleDef,
+  type ObserveDef,
   type PathNodeDef,
   type BranchNodeDef,
   type NodeDef,
@@ -47,12 +48,21 @@ const PATH_ATTRS = [
 const PATH_FLAGS = ['inertia', 'longest', 'edges', 'vertices'] as const;
 const CONVOLUTION_ATTRS = ['neighborhood', 'periodic', 'steps', 'comment'];
 const CONVOLUTION_RULE_ATTRS = ['in', 'out', 'p', 'values', 'sum'];
-const UNSUPPORTED_CHILDREN = new Set(['observe']);
+const UNSUPPORTED_CHILDREN = new Set<string>();
+const OBSERVE_ATTRS = ['value', 'from', 'to'];
 const FIELD_ATTRS = ['for', 'on', 'to', 'from', 'recompute', 'essential'];
 
 const ROOT_ATTRS = ['values', 'origin'];
 const RULE_ATTRS = ['in', 'out', 'p', 'symmetry'];
-const RULE_NODE_ATTRS = ['symmetry', 'steps', 'comment', 'temperature'];
+const RULE_NODE_ATTRS = [
+  'symmetry',
+  'steps',
+  'comment',
+  'temperature',
+  'search',
+  'limit',
+  'depthCoefficient',
+];
 const BRANCH_ATTRS = ['symmetry', 'comment'];
 const MAP_ATTRS = ['scale', 'values', 'symmetry', 'comment'];
 
@@ -231,12 +241,28 @@ export function programFromXml(source: string): XmlParseResult {
       if (comment !== undefined) node.comment = comment;
       const steps = readNumber(el, 'steps', path, true);
       if (steps !== undefined) node.steps = steps;
+      if (readBool(el, 'search')) node.search = true;
+      const limit = readNumber(el, 'limit', path, true);
+      if (limit !== undefined && limit >= 0) node.limit = limit;
+      const depthCoefficient = readNumber(el, 'depthCoefficient', path, false);
+      if (depthCoefficient !== undefined) node.depthCoefficient = depthCoefficient;
       const temperature = readNumber(el, 'temperature', path, false);
       if (temperature !== undefined && temperature !== 0) node.temperature = temperature;
 
       const ruleEls = el.children.filter((c) => c.name === 'rule');
       for (const child of el.children) {
         if (child.name === 'rule') continue;
+        if (child.name === 'observe') {
+          checkAttributes(child, OBSERVE_ATTRS, path);
+          const obs: ObserveDef = {
+            value: child.attributes.get('value') ?? '',
+            to: (child.attributes.get('to') ?? '').replace(/ /g, ''),
+          };
+          const from = child.attributes.get('from');
+          if (from !== undefined) obs.from = from;
+          (node.observations ??= []).push(obs);
+          continue;
+        }
         if (child.name === 'field') {
           checkAttributes(child, FIELD_ATTRS, path);
           const field: FieldDef = {
@@ -532,6 +558,9 @@ export function programToXml(program: Program): string {
       ...(inline ? ruleAttrs(node.rules[0]!) : []),
       ['steps', node.steps],
       ['temperature', node.temperature],
+      ['search', node.search ? 'True' : undefined],
+      ['limit', node.limit],
+      ['depthCoefficient', node.depthCoefficient],
       ['symmetry', node.symmetry],
       ['comment', node.comment],
     ])}`;
@@ -539,6 +568,15 @@ export function programToXml(program: Program): string {
       for (const r of node.rules) {
         children.push(`${childPad}<rule${attrs([...ruleAttrs(r), ['symmetry', r.symmetry]])}/>`);
       }
+    }
+    for (const o of node.observations ?? []) {
+      children.push(
+        `${childPad}<observe${attrs([
+          ['value', o.value],
+          ['from', o.from],
+          ['to', o.to],
+        ])}/>`,
+      );
     }
     for (const f of node.fields ?? []) {
       children.push(

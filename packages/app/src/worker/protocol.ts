@@ -47,6 +47,8 @@ export interface Status {
 
 export type WorkerToMain =
   | { type: 'loaded'; width: number; height: number; characters: string }
+  /** Sent while a long search runs (the worker can't take messages until it ends). */
+  | { type: 'progress'; visited: number; done: boolean; found?: number }
   | { type: 'error'; issues: Issue[] }
   | ({ type: 'status' } & Status)
   | ({

@@ -10,6 +10,7 @@ export type {
   FieldDef,
   MapNodeDef,
   MapRuleDef,
+  ObserveDef,
   Alphabet,
   PathNodeDef,
   Neighborhood,
@@ -41,6 +42,8 @@ export type { Issue } from './errors';
 
 export { validateProgram } from './validate';
 export { createRun } from './interpreter';
+export type { Progress } from './context';
+export { SEARCH_STATE_CAP } from './search';
 export type { Run, RunOptions, StepResult } from './interpreter';
 
 export { programFromXml, programToXml, withLines, pathKey } from './xml';

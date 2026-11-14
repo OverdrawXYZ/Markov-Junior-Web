@@ -91,6 +91,7 @@ source (`Interpreter.cs`, `RuleNode.cs`, `OneNode.cs`, `AllNode.cs`, `ParallelNo
 │       │   │   ├── FieldsEditor/   # distance fields + temperature for one/all
 │       │   │   ├── PathEditor/     # path node settings
 │       │   │   ├── MapEditor/      # map scale, alphabet, translation rules
+│       │   │   ├── GoalsEditor/    # observe goals + search settings
 │       │   │   ├── Palette/        # symbols, colours, unions, origin
 │       │   │   ├── PatternView/    # a rule pattern as a tiny colour grid
 │       │   │   ├── Transport/      # run / pause / step / reset / speed / seed / size
@@ -200,6 +201,9 @@ Notes:
   inputs use the outer alphabet. Use `alphabetAt(program, path)` (engine) or
   `scopedProgram(program, path)` (app) — never `program.values` — when showing or validating a
   node's symbols. Palette edits (rename, usage) stay in the top-level alphabet.
+- `search` runs synchronously inside one engine step and reports progress via `onProgress`
+  (forwarded by the worker as `progress` messages). Stopping it restarts the worker
+  (`EngineClient.restart`) — there is no other way to interrupt it.
 - A `map` can change the grid's size and alphabet mid-run: `Run.width/height/characters/state`
   are getters, and every worker frame carries its `characters`.
 - `npm run typecheck` uses `tsc -b --force`: plain `tsc -b` in the app can miss errors caused by

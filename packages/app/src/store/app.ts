@@ -83,6 +83,8 @@ export interface AppState {
   stepSize: number;
 
   mode: RunMode;
+  /** Progress of a running search, while one is running. */
+  search: { visited: number } | null;
   halted: boolean;
   stepCount: number;
   activeNodePath: NodePath | null;
@@ -269,6 +271,7 @@ export const useApp = create<AppState>()((set, get) => {
     speedIndex: DEFAULT_SPEED_INDEX,
     stepSize: 1,
     mode: 'paused',
+    search: null,
     halted: false,
     stepCount: 0,
     activeNodePath: null,
@@ -394,6 +397,15 @@ export const useApp = create<AppState>()((set, get) => {
     },
     pause() {
       userPaused = true;
+      if (get().search && engine) {
+        // A search blocks the worker; the only way to stop it is a fresh one.
+        engine.restart();
+        set({ search: null, mode: 'paused' });
+        engine.send({ type: 'setSpeed', stepsPerFrame: SPEEDS[get().speedIndex]! });
+        loaded = null;
+        scheduleLoad(true);
+        return;
+      }
       send({ type: 'pause' });
     },
     togglePlay: () => (get().mode !== 'paused' ? get().pause() : get().play()),
@@ -412,9 +424,13 @@ export const useApp = create<AppState>()((set, get) => {
 function onEngineMessage(msg: WorkerToMain): void {
   switch (msg.type) {
     case 'loaded':
+      useApp.setState({ search: null });
       break;
     case 'error':
       useApp.setState({ issues: msg.issues, mode: 'paused' });
+      break;
+    case 'progress':
+      useApp.setState({ search: msg.done ? null : { visited: msg.visited } });
       break;
     case 'status':
     case 'frame': {

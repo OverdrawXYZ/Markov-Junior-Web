@@ -28,6 +28,13 @@ exports[`golden outputs > BiasedMazeGrowth at size 117 1`] = `
 }
 `;
 
+exports[`golden outputs > BishopParity at size 60 1`] = `
+{
+  "hash": "989fb681",
+  "steps": 34,
+}
+`;
+
 exports[`golden outputs > Cave at size 60 1`] = `
 {
   "hash": "cf67593c",
@@ -39,6 +46,13 @@ exports[`golden outputs > ConnectedCaves at size 60 1`] = `
 {
   "hash": "aa02fe97",
   "steps": 127,
+}
+`;
+
+exports[`golden outputs > DiagonalPath at size 80 1`] = `
+{
+  "hash": "7fd979fe",
+  "steps": 63,
 }
 `;
 
@@ -137,5 +151,12 @@ exports[`golden outputs > River at size 80 1`] = `
 {
   "hash": "850143bb",
   "steps": 12365,
+}
+`;
+
+exports[`golden outputs > SequentialSokoban at size 20 1`] = `
+{
+  "hash": "1f83ab68",
+  "steps": 126,
 }
 `;

@@ -1,4 +1,4 @@
-import type { ConvolutionRuleDef, FieldDef, NodeDef, PathNodeDef } from '@mj/engine';
+import type { ConvolutionRuleDef, FieldDef, NodeDef, ObserveDef, PathNodeDef } from '@mj/engine';
 
 /** Largest rule pattern the painter offers. */
 export const MAX_PATTERN = 9;
@@ -61,4 +61,10 @@ export function describePath(node: PathNodeDef): string {
     .filter(Boolean)
     .join(', ');
   return `Each step draws a ${color} path from ${start} ${list(node.from)} to ${list(node.to)}, through ${list(node.on)}${extras ? ` (${extras})` : ''}.`;
+}
+
+/** Plain-language reading of a goal, e.g. "I cells become B now and must end as W." */
+export function describeObservation(o: ObserveDef): string {
+  const now = o.from !== undefined && o.from !== o.value ? ` become ${o.from} now and` : '';
+  return `${o.value} cells${now} must end as ${list(o.to)}.`;
 }

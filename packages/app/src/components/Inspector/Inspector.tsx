@@ -36,6 +36,7 @@ import { NumberField } from '../NumberField/NumberField';
 import { PatternView } from '../PatternView/PatternView';
 import { ConvolutionEditor } from '../ConvolutionEditor/ConvolutionEditor';
 import { FieldsEditor } from '../FieldsEditor/FieldsEditor';
+import { GoalsEditor } from '../GoalsEditor/GoalsEditor';
 import { MapEditor } from '../MapEditor/MapEditor';
 import { PathEditor } from '../PathEditor/PathEditor';
 import { RuleEditor } from '../RuleEditor/RuleEditor';
@@ -359,6 +360,13 @@ export function Inspector() {
 
         <NodeActions program={program} path={path} node={node} />
       </div>
+
+      {isRuleNode(node) && node.kind !== 'prl' && (
+        <div className={styles.section}>
+          <h3 className={styles.sectionTitle}>Goals</h3>
+          <GoalsEditor program={program} path={path} />
+        </div>
+      )}
 
       {isMap(node) && (
         <div className={styles.section}>

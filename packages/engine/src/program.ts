@@ -43,6 +43,19 @@ export interface FieldDef {
 }
 export type BranchNodeKind = 'markov' | 'sequence';
 
+/**
+ * A goal for a `one`/`all` node: cells showing `value` are turned into `from`
+ * now and must end up as one of `to`. The node then steers towards that goal
+ * (or, with `search`, plans a whole trajectory to it).
+ */
+export interface ObserveDef {
+  value: string;
+  /** What observed cells become now; defaults to `value`. */
+  from?: string;
+  /** Symbols those cells must end up as. */
+  to: string;
+}
+
 export interface RuleNodeDef {
   kind: RuleNodeKind;
   rules: RuleDef[];
@@ -53,6 +66,14 @@ export interface RuleNodeDef {
    * more randomly.
    */
   temperature?: number;
+  /** Goals to reach (`one`/`all` only). */
+  observations?: ObserveDef[];
+  /** With observations: search for a whole trajectory first, then replay it. */
+  search?: boolean;
+  /** Search: maximum number of states to explore (default: unlimited, but capped). */
+  limit?: number;
+  /** Search: weight of the path length in the ranking (default 0.5; negative = depth-first). */
+  depthCoefficient?: number;
   /** Maximum number of steps this node may take before it stops (0 / omitted = unlimited). */
   steps?: number;
   symmetry?: string;

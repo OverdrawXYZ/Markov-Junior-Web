@@ -117,6 +117,7 @@ export function validateProgram(program: Program): Issue[] {
       issues.push({ message: `temperature must be 0 or more, got ${node.temperature}`, path });
     }
     validateFields(node, path, scope.values, issues);
+    validateObservations(node, path, scope.values, issues);
     node.rules.forEach((rule, r) =>
       validateRule(rule, path, r, scope.inputs, scope.values, issues),
     );
@@ -308,5 +309,44 @@ function validatePath(
   }
   if (node.color !== undefined && ([...node.color].length !== 1 || !values.has(node.color))) {
     issues.push({ message: `path: color must be one of the symbols, got "${node.color}"`, path });
+  }
+}
+
+function validateObservations(
+  node: RuleNodeDef,
+  path: NodePath,
+  values: ReadonlySet<string>,
+  issues: Issue[],
+): void {
+  const observations = node.observations ?? [];
+  if (observations.length > 0 && node.kind === 'prl') {
+    issues.push({ message: 'observe only works in one and all nodes', path });
+  }
+  if (
+    observations.length === 0 &&
+    (node.search || node.limit !== undefined || node.depthCoefficient !== undefined)
+  ) {
+    issues.push({ message: 'search settings need at least one <observe>', path });
+  }
+  if (node.limit !== undefined && !(Number.isInteger(node.limit) && node.limit > 0)) {
+    issues.push({ message: `limit must be a positive integer, got ${node.limit}`, path });
+  }
+  const seenValue = new Set<string>();
+  for (const o of observations) {
+    const label = `observe ${o.value || '?'}`;
+    if ([...o.value].length !== 1 || !values.has(o.value)) {
+      issues.push({ message: `${label}: "value" must be one of the symbols`, path });
+    } else if (seenValue.has(o.value)) {
+      issues.push({ message: `${label}: ${o.value} is already observed`, path });
+    }
+    seenValue.add(o.value);
+    if (o.from !== undefined && ([...o.from].length !== 1 || !values.has(o.from))) {
+      issues.push({ message: `${label}: "from" must be one of the symbols`, path });
+    }
+    if (o.to.length === 0)
+      issues.push({ message: `${label}: "to" needs at least one symbol`, path });
+    for (const ch of new Set(o.to)) {
+      if (!values.has(ch)) issues.push({ message: `${label}: unknown symbol ${ch} in "to"`, path });
+    }
   }
 }

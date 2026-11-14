@@ -1,6 +1,7 @@
 import type { Context } from './context';
 import { ProgramError } from './errors';
 import { Field } from './field';
+import type { Observation } from './observation';
 import { Grid } from './grid';
 import { AllNode } from './nodes/all';
 import { Branch, MarkovNode, SequenceNode, type Node } from './nodes/node';
@@ -18,6 +19,7 @@ import {
   type ConvolutionNodeDef,
   type FieldDef,
   type MapNodeDef,
+  type ObserveDef,
   type NodeDef,
   type NodePath,
   type Program,
@@ -75,6 +77,10 @@ function compileNode(def: NodeDef, path: NodePath, inherited: SymmetryMask, ctx:
   const options = {
     fields: compileFields(def.fields, ctx.grid),
     temperature: def.temperature ?? 0,
+    observations: compileObservations(def.observations, ctx.grid),
+    search: def.search ?? false,
+    limit: def.limit ?? -1,
+    depthCoefficient: def.depthCoefficient ?? 0.5,
   };
   switch (def.kind) {
     case 'one':
@@ -201,4 +207,20 @@ function compileMap(
     ctx.grid = source;
   }
   return node;
+}
+
+/** Per-symbol compiled observations, or null if the node has none. */
+function compileObservations(
+  defs: readonly ObserveDef[] | undefined,
+  grid: Grid,
+): (Observation | null)[] | null {
+  if (!defs || defs.length === 0) return null;
+  const observations = new Array<Observation | null>(grid.C).fill(null);
+  for (const o of defs) {
+    observations[grid.values.get(o.value)!] = {
+      from: grid.values.get(o.from ?? o.value)!,
+      to: grid.wave(o.to),
+    };
+  }
+  return observations;
 }

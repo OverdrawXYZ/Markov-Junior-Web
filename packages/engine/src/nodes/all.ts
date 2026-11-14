@@ -6,6 +6,7 @@ import { RuleNode, type RuleNodeOptions } from './rule-node';
 
 /** Applies a maximal set of non-overlapping matches, in random order, per turn. */
 export class AllNode extends RuleNode {
+  protected override readonly searchesAll = true;
   private order = new Int32Array(64);
   private keys = new Float64Array(64);
   private readonly ranked: number[] = [];
@@ -25,6 +26,8 @@ export class AllNode extends RuleNode {
   go(): boolean {
     if (!this.scan()) return false;
     this.lastMatchedTurn = this.ctx.counter;
+    const replayed = this.replay();
+    if (replayed !== null) return replayed;
     if (this.matchCount === 0) return false;
 
     const { grid, rng, changes, first } = this.ctx;

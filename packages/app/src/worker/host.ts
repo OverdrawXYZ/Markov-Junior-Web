@@ -94,7 +94,18 @@ export class EngineHost {
   private load(program: Program, width: number, height: number, seed: number): void {
     this.setMode('paused');
     try {
-      this.run = createRun(program, { width, height, seed });
+      this.run = createRun(program, {
+        width,
+        height,
+        seed,
+        onProgress: (p) =>
+          this.post({
+            type: 'progress',
+            visited: p.visited,
+            done: p.done ?? false,
+            ...(p.found !== undefined && { found: p.found }),
+          }),
+      });
     } catch (e) {
       this.run = null;
       const issues = e instanceof ProgramError ? [...e.issues] : [{ message: String(e) }];

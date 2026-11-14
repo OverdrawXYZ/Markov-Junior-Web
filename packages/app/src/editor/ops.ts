@@ -16,6 +16,7 @@ import {
   type FieldDef,
   type MapNodeDef,
   type MapRuleDef,
+  type ObserveDef,
   type PathNodeDef,
   type Neighborhood,
   nodeAt,
@@ -141,6 +142,9 @@ export function updateNode(
     neighborhood?: Neighborhood | undefined;
     periodic?: boolean | undefined;
     temperature?: number | undefined;
+    search?: boolean | undefined;
+    limit?: number | undefined;
+    depthCoefficient?: number | undefined;
   },
 ): Program {
   return mapNode(program, path, (node) => {
@@ -150,7 +154,8 @@ export function updateNode(
       if (k === 'steps' && isBranch(node)) continue;
       if (k === 'symmetry' && conv) continue;
       if ((k === 'neighborhood' || k === 'periodic') && !conv) continue;
-      if (k === 'temperature' && !isRuleNode(node)) continue;
+      if (['temperature', 'search', 'limit', 'depthCoefficient'].includes(k) && !isRuleNode(node))
+        continue;
       if (k === 'temperature' && v === 0) {
         delete next[k];
         continue;
@@ -404,6 +409,12 @@ function allRules(node: NodeDef): { in: string; out: string; values?: string }[]
   return hasRules(node) ? node.rules : [];
 }
 
+function allObservations(node: NodeDef): ObserveDef[] {
+  if (isMap(node)) return [];
+  if (isBranch(node)) return node.children.flatMap(allObservations);
+  return isRuleNode(node) ? (node.observations ?? []) : [];
+}
+
 function allPaths(node: NodeDef): PathNodeDef[] {
   if (isMap(node)) return [];
   if (isBranch(node)) return node.children.flatMap(allPaths);
@@ -421,10 +432,13 @@ export function symbolUsage(program: Program, ch: string): number {
   const fields = allFields(program.root).filter((f) =>
     [f.for, f.on, f.to ?? '', f.from ?? ''].some((part) => part.includes(ch)),
   ).length;
+  const observations = allObservations(program.root).filter((o) =>
+    [o.value, o.from ?? '', o.to].some((part) => part.includes(ch)),
+  ).length;
   const paths = allPaths(program.root).filter((n) =>
     [n.from, n.to, n.on, n.color ?? ''].some((part) => part.includes(ch)),
   ).length;
-  return rules + unions + fields + paths;
+  return rules + unions + fields + paths + observations;
 }
 
 /** Characters that may not be used as a new symbol or union. */
@@ -477,6 +491,13 @@ export function renameSymbol(program: Program, from: string, to: string): Progra
     }
     if (isConvolution(node)) return { ...node, rules: node.rules.map(renameRule) };
     const next: RuleNodeDef = { ...node, rules: node.rules.map(renameRule) };
+    if (node.observations) {
+      next.observations = node.observations.map((o) => {
+        const r: ObserveDef = { ...o, value: swap(o.value), to: swap(o.to) };
+        if (o.from !== undefined) r.from = swap(o.from);
+        return r;
+      });
+    }
     if (node.fields) {
       next.fields = node.fields.map((f) => {
         const g: FieldDef = { ...f, for: swap(f.for), on: swap(f.on) };
@@ -688,4 +709,63 @@ export function scopedProgram(program: Program, path: NodePath): Program {
   const sameUnions = unions === program.unions || (unions.length === 0 && !program.unions?.length);
   if (values === program.values && sameUnions) return program;
   return { ...program, values, unions: [...unions] };
+}
+
+// ---------------------------------------------------------------- goals (observe)
+
+function mapObservations(
+  program: Program,
+  path: NodePath,
+  fn: (observations: ObserveDef[]) => ObserveDef[],
+): Program {
+  return mapNode(program, path, (n) => {
+    if (!isRuleNode(n)) return n;
+    const observations = fn(n.observations ?? []);
+    const next: RuleNodeDef = { ...n, observations };
+    if (observations.length === 0) {
+      delete next.observations;
+      delete next.search;
+      delete next.limit;
+      delete next.depthCoefficient;
+    }
+    return next;
+  });
+}
+
+/** A starting goal: the last symbol (as a marker) must end up as the second. */
+export function defaultObservation(program: Program, path: NodePath): ObserveDef {
+  const v = alphabetAt(program, path).values;
+  return { value: v[v.length - 1] ?? 'B', from: v[0] ?? 'B', to: v[1] ?? v[0] ?? 'B' };
+}
+
+export function addObservation(
+  program: Program,
+  path: NodePath,
+  observation?: ObserveDef,
+): Program {
+  const next = observation ?? defaultObservation(program, path);
+  return mapObservations(program, path, (list) => [...list, next]);
+}
+
+export function updateObservation(
+  program: Program,
+  path: NodePath,
+  index: number,
+  patch: { value?: string; from?: string | undefined; to?: string },
+): Program {
+  return mapObservations(program, path, (list) =>
+    list.map((o, i) => {
+      if (i !== index) return o;
+      const next: Record<string, unknown> = { ...o };
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === undefined) delete next[k];
+        else next[k] = v;
+      }
+      return next as unknown as ObserveDef;
+    }),
+  );
+}
+
+export function removeObservation(program: Program, path: NodePath, index: number): Program {
+  return mapObservations(program, path, (list) => list.filter((_, i) => i !== index));
 }

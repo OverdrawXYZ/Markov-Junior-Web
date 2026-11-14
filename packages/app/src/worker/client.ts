@@ -4,6 +4,11 @@ import type { MainToWorker, WorkerToMain } from './protocol';
 export interface EngineClient {
   send(msg: MainToWorker): void;
   subscribe(listener: (msg: WorkerToMain) => void): () => void;
+  /**
+   * Throw away the engine and start a fresh one — the only way to stop a long
+   * synchronous search. The caller must load a program again afterwards.
+   */
+  restart(): void;
   dispose(): void;
 }
 
@@ -20,17 +25,31 @@ export function createEngineClient(): EngineClient {
   };
 
   if (typeof Worker !== 'undefined') {
-    const worker = new Worker(new URL('./engine.worker.ts', import.meta.url), { type: 'module' });
-    worker.onmessage = (e: MessageEvent<WorkerToMain>) => emit(e.data);
-    worker.onerror = (e) =>
-      emit({ type: 'error', issues: [{ message: `engine worker failed: ${e.message}` }] });
-    return { send: (msg) => worker.postMessage(msg), subscribe, dispose: () => worker.terminate() };
+    const spawn = () => {
+      const w = new Worker(new URL('./engine.worker.ts', import.meta.url), { type: 'module' });
+      w.onmessage = (e: MessageEvent<WorkerToMain>) => emit(e.data);
+      w.onerror = (e) =>
+        emit({ type: 'error', issues: [{ message: `engine worker failed: ${e.message}` }] });
+      return w;
+    };
+    let worker = spawn();
+    return {
+      send: (msg) => worker.postMessage(msg),
+      subscribe,
+      restart: () => {
+        worker.terminate();
+        worker = spawn();
+      },
+      dispose: () => worker.terminate(),
+    };
   }
 
   const host = new EngineHost((msg) => queueMicrotask(() => emit(msg)));
   return {
     send: (msg) => queueMicrotask(() => host.handle(msg)),
     subscribe,
+    // In-process runs can't be interrupted; nothing to restart.
+    restart: () => {},
     dispose: () => host.dispose(),
   };
 }

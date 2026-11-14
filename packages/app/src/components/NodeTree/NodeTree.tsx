@@ -24,7 +24,12 @@ import {
   removeRule,
   samePath,
 } from '../../editor/ops';
-import { describeField, describePathShort, KIND_HINT } from '../../editor/labels';
+import {
+  describeField,
+  describeObservation,
+  describePathShort,
+  KIND_HINT,
+} from '../../editor/labels';
 import { useApp, type Selection } from '../../store/app';
 import { PatternView } from '../PatternView/PatternView';
 import styles from './NodeTree.module.css';
@@ -147,6 +152,15 @@ function NodeRow({ node, path, program, drop, setDrop, onDrop }: RowProps) {
           <span className={styles.meta} title={node.fields.map(describeField).join('\n')}>
             {node.fields.length === 1 ? '1 field' : `${node.fields.length} fields`}
             {node.temperature ? ` · t=${node.temperature}` : ''}
+          </span>
+        )}
+        {isRuleNode(node) && node.observations && (
+          <span
+            className={styles.meta}
+            title={node.observations.map(describeObservation).join('\n')}
+          >
+            {node.observations.length === 1 ? '1 goal' : `${node.observations.length} goals`}
+            {node.search ? ' · search' : ''}
           </span>
         )}
         {isConvolution(node) && (

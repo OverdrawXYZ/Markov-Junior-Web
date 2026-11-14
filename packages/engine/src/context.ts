@@ -17,4 +17,18 @@ export interface Context {
   current: Branch | null;
   /** Rule node that made progress most recently. */
   lastActive: Node | null;
+  /** Most states a search without its own `limit` may explore. */
+  searchStateCap: number;
+  /** Long-running work (search) reports progress here, e.g. so a worker can tell the UI. */
+  onProgress?: ((progress: Progress) => void) | undefined;
+}
+
+export interface Progress {
+  kind: 'search';
+  /** States explored so far. */
+  visited: number;
+  /** Set when the search finishes. */
+  done?: boolean;
+  /** Length of the trajectory found (if done and successful). */
+  found?: number;
 }

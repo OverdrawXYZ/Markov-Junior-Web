@@ -27,6 +27,9 @@ const CASES: [name: string, size: number, maxSteps?: number][] = [
   ['MarchingSquares', 20],
   ['MazeMap', 30],
   ['OddScale', 8],
+  ['DiagonalPath', 80],
+  ['BishopParity', 60],
+  ['SequentialSokoban', 20],
 ];
 
 describe('golden outputs', () => {

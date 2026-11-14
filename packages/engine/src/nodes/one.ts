@@ -2,6 +2,7 @@ import type { Context } from '../context';
 import type { NodePath } from '../program';
 import { WILDCARD_OUT, type Rule } from '../rule';
 import { deltaPointwise } from '../field';
+import { isGoalReached } from '../observation';
 import { RuleNode, type RuleNodeOptions } from './rule-node';
 
 /** Applies one uniformly random match per turn. */
@@ -29,6 +30,8 @@ export class OneNode extends RuleNode {
   go(): boolean {
     if (!this.scan()) return false;
     this.lastMatchedTurn = this.ctx.counter;
+    const replayed = this.replay();
+    if (replayed !== null) return replayed;
 
     const k = this.randomMatch();
     if (k < 0) return false;
@@ -81,6 +84,10 @@ export class OneNode extends RuleNode {
   private bestMatch(): number {
     const { grid } = this.ctx;
     const { MX, MY, state } = grid;
+    if (this.observations && isGoalReached(state, this.future!)) {
+      this.futureComputed = false;
+      return -1;
+    }
     const d = this.matchData;
     let max = -1000;
     let argmax = -1;

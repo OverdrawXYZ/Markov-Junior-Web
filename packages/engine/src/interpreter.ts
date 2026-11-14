@@ -1,15 +1,20 @@
 import { compileProgram } from './compile';
-import type { Context } from './context';
+import type { Context, Progress } from './context';
 import { Grid } from './grid';
 import { IntList } from './int-list';
 import type { Branch } from './nodes/node';
 import type { NodePath, Program } from './program';
 import { createRng } from './rng';
+import { SEARCH_STATE_CAP } from './search';
 
 export interface RunOptions {
   width: number;
   height: number;
   seed: number;
+  /** Called during long-running work (search), e.g. to report progress from a worker. */
+  onProgress?: (progress: Progress) => void;
+  /** Most states a search without its own `limit` may explore (default SEARCH_STATE_CAP). */
+  searchStateCap?: number;
 }
 
 export interface StepResult {
@@ -59,6 +64,8 @@ export function createRun(program: Program, options: RunOptions): Run {
     counter: 0,
     current: null,
     lastActive: null,
+    onProgress: options.onProgress,
+    searchStateCap: options.searchStateCap ?? SEARCH_STATE_CAP,
   };
   const root: Branch = compileProgram(program, ctx);
   const origin = program.origin ?? false;

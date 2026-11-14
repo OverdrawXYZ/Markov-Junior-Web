@@ -2,12 +2,25 @@ import type { Context } from '../context';
 import type { Rule } from '../rule';
 import type { NodePath } from '../program';
 import type { Field } from '../field';
+import {
+  computeBackwardPotentials,
+  computeFutureSetPresent,
+  type Observation,
+} from '../observation';
+import { createRng } from '../rng';
+import { searchTrajectory } from '../search';
 import { Node } from './node';
 
 export interface RuleNodeOptions {
   /** fields[symbol] guides where that symbol is placed, or null. */
   fields?: (Field | null)[] | null;
   temperature?: number;
+  /** observations[symbol] is the goal for that symbol, or null. */
+  observations?: (Observation | null)[] | null;
+  search?: boolean;
+  /** Search: max states (-1 = unlimited, capped). */
+  limit?: number;
+  depthCoefficient?: number;
 }
 
 /**
@@ -35,6 +48,17 @@ export abstract class RuleNode extends Node {
   /** potentials[symbol][cell]: that symbol's field (0 for symbols without one). */
   protected readonly potentials: Int32Array[] | null;
   protected readonly temperature: number;
+  protected readonly observations: (Observation | null)[] | null;
+  /** future[cell]: bitmask of symbols the cell must end up as. */
+  protected readonly future: Int32Array | null;
+  protected futureComputed = false;
+  /** Search result: grid states to replay, one per step. */
+  protected trajectory: Uint8Array[] | null = null;
+  private readonly search: boolean;
+  private readonly limit: number;
+  private readonly depthCoefficient: number;
+  /** Search over every maximal set of matches (all nodes) instead of single matches. */
+  protected readonly searchesAll: boolean = false;
 
   constructor(
     ctx: Context,
@@ -49,8 +73,15 @@ export abstract class RuleNode extends Node {
     this.last = new Uint8Array(rules.length);
     this.fields = options.fields ?? null;
     this.temperature = options.temperature ?? 0;
+    this.observations = options.observations ?? null;
+    this.search = options.search ?? false;
+    this.limit = options.limit ?? -1;
+    this.depthCoefficient = options.depthCoefficient ?? 0.5;
     const cells = ctx.grid.state.length;
-    this.potentials = this.fields
+    this.future = this.observations ? new Int32Array(cells) : null;
+    // Fields and (non-search) observations steer matches through per-symbol potentials.
+    const steered = this.fields || (this.observations && !this.search);
+    this.potentials = steered
       ? Array.from({ length: ctx.grid.C }, () => new Int32Array(cells))
       : null;
   }
@@ -66,7 +97,29 @@ export abstract class RuleNode extends Node {
   reset(): void {
     this.lastMatchedTurn = -1;
     this.counter = 0;
+    this.futureComputed = false;
     this.last.fill(0);
+  }
+
+  /**
+   * With a search trajectory: set the grid to its next state (logging changed
+   * cells). Returns null when there is no trajectory.
+   */
+  protected replay(): boolean | null {
+    const trajectory = this.trajectory;
+    if (!trajectory) return null;
+    if (this.counter >= trajectory.length) return false;
+    const next = trajectory[this.counter]!;
+    const { state } = this.ctx.grid;
+    for (let i = 0; i < state.length; i++) {
+      if (state[i] !== next[i]) {
+        state[i] = next[i]!;
+        this.ctx.changes.push(i);
+      }
+    }
+    this.counter++;
+    this.ctx.lastActive = this;
+    return true;
   }
 
   protected add(r: number, x: number, y: number, z: number): void {
@@ -89,6 +142,37 @@ export abstract class RuleNode extends Node {
   protected scan(): boolean {
     this.last.fill(0);
     if (this.steps > 0 && this.counter >= this.steps) return false;
+
+    if (this.observations && !this.futureComputed) {
+      const { grid, changes, rng } = this.ctx;
+      const ok = computeFutureSetPresent(this.future!, grid.state, this.observations, (i) =>
+        changes.push(i),
+      );
+      if (!ok) return false;
+      this.futureComputed = true;
+      if (this.search) {
+        this.trajectory = null;
+        const tries = this.limit < 0 ? 1 : 20;
+        for (let k = 0; k < tries && !this.trajectory; k++) {
+          this.trajectory = searchTrajectory(
+            grid.state,
+            this.future!,
+            this.rules,
+            grid.MX,
+            grid.MY,
+            grid.C,
+            this.searchesAll,
+            this.limit,
+            this.depthCoefficient,
+            createRng(rng.nextInt(0x7fffffff)),
+            this.ctx.onProgress,
+            this.ctx.searchStateCap,
+          );
+        }
+      } else {
+        computeBackwardPotentials(this.potentials!, this.future!, grid.MX, grid.MY, this.rules);
+      }
+    }
 
     const { grid, changes, first } = this.ctx;
     const { MX, MY, MZ, state } = grid;

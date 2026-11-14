@@ -13,6 +13,8 @@ import MarchingSquares from './MarchingSquares.xml?raw';
 import MazeGrowth from './MazeGrowth.xml?raw';
 import NystromDungeon from './NystromDungeon.xml?raw';
 import River from './River.xml?raw';
+import SequentialSokoban from './SequentialSokoban.xml?raw';
+import SnellLaw from './SnellLaw.xml?raw';
 
 export interface Example {
   id: string;
@@ -105,6 +107,20 @@ export const EXAMPLES: readonly Example[] = [
     description: 'Noise mapped onto a 3× grid of smooth shapes with a map node.',
     source: MarchingSquares,
     size: 20,
+  },
+  {
+    id: 'SequentialSokoban',
+    name: 'Sokoban',
+    description: 'Pushes boxes onto targets, planned in advance by search.',
+    source: SequentialSokoban,
+    size: 20,
+  },
+  {
+    id: 'SnellLaw',
+    name: "Snell's law",
+    description: 'A path steered by a goal bends where it crosses into a slower medium.',
+    source: SnellLaw,
+    size: 80,
   },
   {
     id: 'GameOfLife',

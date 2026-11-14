@@ -90,6 +90,36 @@ export class Rule {
     this.ishifts = lists.map((l) => Int32Array.from(l));
   }
 
+  private _binput: Uint8Array | null = null;
+  private _oshifts: Int32Array[] | null = null;
+
+  /** Input as single symbols: the lowest symbol of each wave, or WILDCARD_OUT for `*` (for observe). */
+  get binput(): Uint8Array {
+    if (!this._binput) {
+      const all = (1 << this.C) - 1;
+      this._binput = Uint8Array.from(this.input, (w) =>
+        w === all ? WILDCARD_OUT : 31 - Math.clz32(w & -w),
+      );
+    }
+    return this._binput;
+  }
+
+  /** Like ishifts, for the output: positions that write c (or leave any symbol, for `*`). */
+  get oshifts(): Int32Array[] {
+    if (!this._oshifts) {
+      const lists: number[][] = Array.from({ length: this.C }, () => []);
+      for (let z = 0; z < this.OMZ; z++)
+        for (let y = 0; y < this.OMY; y++)
+          for (let x = 0; x < this.OMX; x++) {
+            const o = this.output[x + y * this.OMX + z * this.OMX * this.OMY]!;
+            if (o !== WILDCARD_OUT) lists[o]!.push(x, y, z);
+            else for (let c = 0; c < this.C; c++) lists[c]!.push(x, y, z);
+          }
+      this._oshifts = lists.map((l) => Int32Array.from(l));
+    }
+    return this._oshifts;
+  }
+
   /** Rotate 90° in the xy plane. */
   zRotated(): Rule {
     const input = rotate(this.input, this.IMX, this.IMY, this.IMZ, Int32Array);

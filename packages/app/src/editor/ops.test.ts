@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { programFromXml, programToXml, validateProgram, type Program } from '@mj/engine';
 import {
   addField,
+  addObservation,
+  removeObservation,
+  updateObservation,
   addMapRule,
   moveMapRule,
   removeMapRule,
@@ -378,5 +381,28 @@ describe('map nodes', () => {
     expect(scopedProgram(p0, [1, 0]).values).toBe('BA');
     expect(scopedProgram(p0, [1]).values).toBe('BW');
     expect(scopedProgram(p0, [0])).toBe(p0);
+  });
+});
+
+describe('goals (observe)', () => {
+  const p0 = load('<one values="BRWI" in="RB" out="BR"/>');
+
+  it('adds, edits and removes goals and search settings', () => {
+    let p = addObservation(p0, []);
+    expect(xml(p)).toContain('<observe value="I" from="B" to="R"/>');
+    p = updateObservation(p, [], 0, { from: undefined, to: 'RW' });
+    expect(xml(p)).toContain('<observe value="I" to="RW"/>');
+    p = updateNode(p, [], { search: true, limit: 300, depthCoefficient: 1 });
+    expect(xml(p)).toContain('search="True" limit="300" depthCoefficient="1"');
+    expect(validateProgram(p)).toEqual([]);
+    // Removing the last goal also drops the search settings, which would be invalid alone.
+    p = removeObservation(p, [], 0);
+    expect(xml(p)).toBe('<one values="BRWI" in="RB" out="BR"/>');
+  });
+
+  it('counts and renames symbols used by goals', () => {
+    const p = addObservation(p0, []);
+    expect(symbolUsage(p, 'I')).toBe(1);
+    expect(xml(renameSymbol(p, 'I', 'G'))).toContain('<observe value="G" from="B" to="R"/>');
   });
 });

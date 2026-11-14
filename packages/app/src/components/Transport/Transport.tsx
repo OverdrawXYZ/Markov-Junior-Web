@@ -15,14 +15,17 @@ export function Transport() {
   const height = useApp((s) => s.height);
   const actions = useApp.getState();
 
-  const running = mode !== 'paused';
-  const status = halted
-    ? 'Halted'
-    : mode === 'toEnd'
-      ? 'Running to end'
-      : running
-        ? 'Running'
-        : 'Paused';
+  const search = useApp((s) => s.search);
+  const running = mode !== 'paused' || search !== null;
+  const status = search
+    ? `Searching… ${search.visited.toLocaleString('en-US')} states`
+    : halted
+      ? 'Halted'
+      : mode === 'toEnd'
+        ? 'Running to end'
+        : running
+          ? 'Running'
+          : 'Paused';
   const canAdvance = loaded && !halted;
 
   return (
@@ -34,7 +37,7 @@ export function Transport() {
           onClick={actions.togglePlay}
           disabled={!canAdvance && !running}
         >
-          {running ? 'Pause' : 'Run'}
+          {search ? 'Stop search' : running ? 'Pause' : 'Run'}
         </button>
         <button type="button" onClick={actions.step} disabled={!canAdvance}>
           Step
