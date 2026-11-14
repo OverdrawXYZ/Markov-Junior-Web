@@ -1,0 +1,106 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.summary {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--chip);
+  font-size: 13px;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.label {
+  width: 92px;
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.picker,
+.members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.symbol {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.symbol span {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgb(127 127 127 / 0.45);
+}
+
+.symbol[aria-checked='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  background: var(--accent-soft);
+}
+
+.member {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 4px;
+  color: transparent;
+  opacity: 0.25;
+}
+
+.member[aria-pressed='true'] {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.sum {
+  width: 140px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  font-family: var(--mono);
+}
+
+.sum[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.field input[type='range'] {
+  flex: 1;
+}
+
+.num,
+.muted {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.error {
+  margin: -4px 0 0 100px;
+  font-size: 12px;
+  color: var(--danger);
+}

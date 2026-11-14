@@ -40,7 +40,38 @@ export interface BranchNodeDef {
   comment?: string;
 }
 
-export type NodeDef = RuleNodeDef | BranchNodeDef;
+/** Which neighbours a convolution counts. */
+export type Neighborhood = 'Moore' | 'VonNeumann';
+
+export interface ConvolutionRuleDef {
+  /** Symbol a cell must have. */
+  in: string;
+  /** Symbol it becomes. */
+  out: string;
+  /** Probability of applying when the condition holds. Default 1. */
+  p?: number;
+  /** Symbols to count among the neighbours (requires `sum`). */
+  values?: string;
+  /** Allowed neighbour counts, e.g. "3" or "0,1,4..8" (requires `values`). */
+  sum?: string;
+}
+
+/**
+ * A cellular-automaton step: every cell looks at its neighbourhood and the first
+ * matching rule rewrites it, all cells at once.
+ */
+export interface ConvolutionNodeDef {
+  kind: 'convolution';
+  neighborhood: Neighborhood;
+  rules: ConvolutionRuleDef[];
+  /** Wrap around the grid edges. */
+  periodic?: boolean;
+  /** Maximum number of steps (0 / omitted = until nothing changes). */
+  steps?: number;
+  comment?: string;
+}
+
+export type NodeDef = RuleNodeDef | BranchNodeDef | ConvolutionNodeDef;
 
 export interface UnionDef {
   /** Single character used in rule inputs. */
@@ -63,7 +94,11 @@ export function isBranch(node: NodeDef): node is BranchNodeDef {
 }
 
 export function isRuleNode(node: NodeDef): node is RuleNodeDef {
-  return !isBranch(node);
+  return node.kind === 'one' || node.kind === 'all' || node.kind === 'prl';
+}
+
+export function isConvolution(node: NodeDef): node is ConvolutionNodeDef {
+  return node.kind === 'convolution';
 }
 
 /** Look up a node by path; returns undefined if the path does not exist. */

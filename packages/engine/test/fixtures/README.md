@@ -21,6 +21,3 @@ test parsing, round-tripping and execution.
 > FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 > OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 > DEALINGS IN THE SOFTWARE.
-
-`GameOfLife.xml` and `Cave.xml` use `<convolution>`, which is not implemented yet; they are
-used to test the "not supported" error path.

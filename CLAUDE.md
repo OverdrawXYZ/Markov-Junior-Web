@@ -87,6 +87,7 @@ source (`Interpreter.cs`, `RuleNode.cs`, `OneNode.cs`, `AllNode.cs`, `ParallelNo
 │       │   │   ├── NodeTree/       # program tree: select, add, drag/drop, keyboard
 │       │   │   ├── Inspector/      # selected node's properties + rules list
 │       │   │   ├── RuleEditor/     # paint in/out patterns, resize, symmetry preview, p
+│       │   │   ├── ConvolutionEditor/ # convolution rules in plain language
 │       │   │   ├── Palette/        # symbols, colours, unions, origin
 │       │   │   ├── PatternView/    # a rule pattern as a tiny colour grid
 │       │   │   ├── Transport/      # run / pause / step / reset / speed / seed / size
@@ -189,6 +190,10 @@ Notes:
   contract — people bookmark and send links. Add a new prefix/key instead of changing them.
 - Keyboard shortcuts live in one table, `SHORTCUTS` in `editor/actions.ts`; the help dialog is
   generated from it.
+- Node kinds: rule nodes (`one`/`all`/`prl`), branches (`markov`/`sequence`) and `convolution`.
+  Don't assume "not a branch ⇒ rule node": use `isRuleNode` / `isConvolution` from the engine.
+- `npm run typecheck` uses `tsc -b --force`: plain `tsc -b` in the app can miss errors caused by
+  engine changes because of its incremental cache.
 - Zustand selectors must return stable values: select the raw array/object and derive in the
   component. A selector that returns a new array (e.g. `s.issues.filter(...)`) loops forever.
 

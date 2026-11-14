@@ -19,7 +19,8 @@ Behaviour that knowingly differs from the reference implementation
 
 - Rules loaded from images: `file`, `fin`, `fout`, `legend` (and `folder`).
 - `<field>`, `<observe>`, `search`, `temperature` (roadmap phase 6).
-- `path`, `map`, `convolution`, `convchain`, `wfc` nodes (roadmap phase 6).
+- `path`, `map`, `convchain`, `wfc` nodes (roadmap phase 6).
+- 3D convolution kernels (`NoCorners`) — 2D `Moore` and `VonNeumann` are supported.
 - 3D grids and patterns, cube symmetries (roadmap phase 7).
 
 ## Faithfully reproduced quirks

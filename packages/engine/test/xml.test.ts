@@ -18,6 +18,8 @@ const SUPPORTED = [
   'BasicSnake',
   'Flowers',
   'NystromDungeon',
+  'GameOfLife',
+  'Cave',
 ];
 
 function issuesOf(fn: () => unknown): readonly Issue[] {
@@ -126,10 +128,11 @@ describe('programFromXml', () => {
     expect(issues.map((i) => i.message).join('\n')).toContain(message);
   });
 
-  it.each(['GameOfLife', 'Cave'])('reports unsupported nodes in %s with a line', (name) => {
-    const issues = issuesOf(() => programFromXml(fixture(name)));
-    expect(issues[0]!.message).toBe('<convolution> nodes are not supported yet');
-    expect(issues[0]!.line).toBeGreaterThan(1);
+  it('reports unsupported nodes with a line', () => {
+    const issues = issuesOf(() =>
+      programFromXml('<sequence values="BW">\n  <wfc tileset="Knots"/>\n</sequence>'),
+    );
+    expect(issues[0]).toMatchObject({ message: '<wfc> nodes are not supported yet', line: 2 });
   });
 });
 

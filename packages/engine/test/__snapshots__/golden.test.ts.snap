@@ -14,10 +14,24 @@ exports[`golden outputs > BasicSnake at size 23 1`] = `
 }
 `;
 
+exports[`golden outputs > Cave at size 60 1`] = `
+{
+  "hash": "cf67593c",
+  "steps": 24,
+}
+`;
+
 exports[`golden outputs > Flowers at size 60 1`] = `
 {
   "hash": "182b1eac",
   "steps": 313,
+}
+`;
+
+exports[`golden outputs > GameOfLife at size 120 1`] = `
+{
+  "hash": "4b9f37cf",
+  "steps": 100,
 }
 `;
 

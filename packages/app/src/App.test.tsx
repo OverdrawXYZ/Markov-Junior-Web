@@ -58,7 +58,7 @@ describe('App', () => {
     await renderApp();
     fireEvent.click(screen.getByRole('button', { name: 'Examples' }));
     const gallery = screen.getByRole('dialog', { name: 'Examples' });
-    expect(within(gallery).getAllByRole('listitem')).toHaveLength(10);
+    expect(within(gallery).getAllByRole('listitem')).toHaveLength(12);
     fireEvent.click(within(gallery).getByRole('button', { name: /^River:/ }));
     expect(screen.queryByRole('dialog')).toBeNull();
     await waitFor(() => expect(useApp.getState().program?.values).toBe('BWRUGE'));

@@ -2,7 +2,9 @@ import Basic from './Basic.xml?raw';
 import DrunkardsWalk from './DrunkardsWalk.xml?raw';
 import Islands from './Islands.xml?raw';
 import BasicSnake from './BasicSnake.xml?raw';
+import Cave from './Cave.xml?raw';
 import Flowers from './Flowers.xml?raw';
+import GameOfLife from './GameOfLife.xml?raw';
 import Growth from './Growth.xml?raw';
 import MazeBacktracker from './MazeBacktracker.xml?raw';
 import MazeGrowth from './MazeGrowth.xml?raw';
@@ -72,6 +74,20 @@ export const EXAMPLES: readonly Example[] = [
     description: 'Random growth from a seed cell.',
     source: Growth,
     size: 79,
+  },
+  {
+    id: 'Cave',
+    name: 'Cave',
+    description: 'Noise smoothed into caves by a cellular automaton.',
+    source: Cave,
+    size: 60,
+  },
+  {
+    id: 'GameOfLife',
+    name: 'Game of Life',
+    description: "Conway's Game of Life on a wrapping grid (never halts).",
+    source: GameOfLife,
+    size: 80,
   },
   {
     id: 'Islands',

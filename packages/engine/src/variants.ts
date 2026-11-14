@@ -1,4 +1,12 @@
-import { isBranch, nodeAt, type NodePath, type Program, type RuleDef } from './program';
+import {
+  isBranch,
+  isRuleNode,
+  nodeAt,
+  type NodeDef,
+  type NodePath,
+  type Program,
+  type RuleDef,
+} from './program';
 import { isSymmetryName, SQUARE_SUBGROUPS, squareSymmetries } from './symmetry';
 
 export const DEFAULT_SYMMETRY = '(xy)';
@@ -78,20 +86,23 @@ export function ruleVariants(
  * The symmetry that applies to a node (or one of its rules), following the
  * inheritance chain: rule → node → ancestors → default `(xy)`.
  */
+const symmetryOf = (node: NodeDef): string | undefined =>
+  'symmetry' in node ? node.symmetry : undefined;
+
 export function effectiveSymmetry(program: Program, path: NodePath, rule?: number): string {
   let result = DEFAULT_SYMMETRY;
   let node = program.root;
-  if (node.symmetry !== undefined) result = node.symmetry;
+  result = symmetryOf(node) ?? result;
   for (const i of path) {
     if (!isBranch(node)) break;
     const child = node.children[i];
     if (!child) break;
     node = child;
-    if (node.symmetry !== undefined) result = node.symmetry;
+    result = symmetryOf(node) ?? result;
   }
   if (rule !== undefined) {
     const target = nodeAt(program.root, path);
-    const r = target && !isBranch(target) ? target.rules[rule] : undefined;
+    const r = target && isRuleNode(target) ? target.rules[rule] : undefined;
     if (r?.symmetry !== undefined) result = r.symmetry;
   }
   return result;

@@ -229,3 +229,48 @@ describe('symbol operations', () => {
     expect(programFromXml(programToXml(p)).program).toEqual(p);
   });
 });
+
+describe('convolution nodes', () => {
+  const life = load(`<sequence values="DAR">
+  <convolution neighborhood="Moore" periodic="True">
+    <rule in="D" out="A" sum="3" values="A"/>
+    <rule in="A" out="D" sum="0,1,4..8" values="A"/>
+  </convolution>
+</sequence>`);
+
+  it('creates a sensible default node', () => {
+    expect(newNode('convolution', life)).toEqual({
+      kind: 'convolution',
+      neighborhood: 'Moore',
+      rules: [{ in: 'D', out: 'A', values: 'A', sum: '1..8' }],
+    });
+  });
+
+  it('is its own kind family', () => {
+    expect(setKind(life, [0], 'one')).toBe(life);
+    expect(setKind(tree, [0], 'convolution')).toBe(tree);
+  });
+
+  it('edits node and rule fields', () => {
+    let p = updateNode(life, [0], {
+      neighborhood: 'VonNeumann',
+      periodic: false,
+      steps: 4,
+      symmetry: '(x)',
+    });
+    expect(xml(p)).toContain('<convolution neighborhood="VonNeumann" steps="4">');
+    p = updateRule(p, [0], 1, { values: undefined, sum: undefined, p: 0.5 });
+    expect(xml(p)).toContain('<rule in="A" out="D" p="0.5"/>');
+    p = addRule(p, [0]);
+    expect(xml(p)).toContain('<rule in="D" out="A" values="A" sum="1..8"/>');
+    expect(validateProgram(p)).toEqual([]);
+  });
+
+  it('counts and renames symbols used as counted values', () => {
+    expect(symbolUsage(life, 'A')).toBe(2);
+    expect(symbolUsage(life, 'R')).toBe(0);
+    expect(xml(renameSymbol(life, 'A', 'L'))).toContain(
+      '<rule in="D" out="L" values="L" sum="3"/>',
+    );
+  });
+});

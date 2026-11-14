@@ -1,5 +1,12 @@
 import { useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
-import { isBranch, nodeAt, type NodeDef, type NodePath, type Program } from '@mj/engine';
+import {
+  isBranch,
+  isConvolution,
+  nodeAt,
+  type NodeDef,
+  type NodePath,
+  type Program,
+} from '@mj/engine';
 import {
   duplicateNode,
   insertNode,
@@ -119,7 +126,15 @@ function NodeRow({ node, path, program, drop, setDrop, onDrop }: RowProps) {
         </span>
         {node.comment && <span className={styles.comment}>{node.comment}</span>}
         {!branch && node.steps ? <span className={styles.meta}>×{node.steps}</span> : null}
-        {node.symmetry && <span className={styles.meta}>{node.symmetry}</span>}
+        {'symmetry' in node && node.symmetry && (
+          <span className={styles.meta}>{node.symmetry}</span>
+        )}
+        {isConvolution(node) && (
+          <span className={styles.meta}>
+            {node.neighborhood === 'Moore' ? '8 neighbours' : '4 neighbours'}
+            {node.periodic ? ' · wraps' : ''}
+          </span>
+        )}
         {nodeIssues.length > 0 && (
           <span
             className={styles.issue}
@@ -189,7 +204,7 @@ function NodeRow({ node, path, program, drop, setDrop, onDrop }: RowProps) {
                   role="treeitem"
                   aria-selected={sel}
                   aria-level={path.length + 2}
-                  aria-label={`rule ${rule.in} to ${rule.out}`}
+                  aria-label={`rule ${rule.in} to ${rule.out}${'values' in rule && rule.values ? ` when ${rule.sum} ${rule.values}` : ''}`}
                   data-selected={sel || undefined}
                   onClick={() => select({ path, rule: i })}
                 >
@@ -206,8 +221,21 @@ function NodeRow({ node, path, program, drop, setDrop, onDrop }: RowProps) {
                     values={program.values}
                     label={`output ${rule.out}`}
                   />
+                  {'values' in rule && rule.values !== undefined && (
+                    <span className={styles.condition}>
+                      if
+                      <PatternView
+                        pattern={[...rule.values].join('')}
+                        values={program.values}
+                        label={`counting ${rule.values}`}
+                      />
+                      <span className={styles.meta}>= {rule.sum}</span>
+                    </span>
+                  )}
                   {rule.p !== undefined && <span className={styles.meta}>p={rule.p}</span>}
-                  {rule.symmetry && <span className={styles.meta}>{rule.symmetry}</span>}
+                  {'symmetry' in rule && rule.symmetry && (
+                    <span className={styles.meta}>{rule.symmetry}</span>
+                  )}
                   {ruleIssue && <span className={styles.issue}>!</span>}
                 </div>
               </li>

@@ -1,6 +1,9 @@
 import { ProgramError, type Issue } from './errors';
 import {
   isBranch,
+  isConvolution,
+  type ConvolutionNodeDef,
+  type ConvolutionRuleDef,
   type BranchNodeDef,
   type NodeDef,
   type NodePath,
@@ -23,7 +26,9 @@ export const pathKey = (path: NodePath): string => path.join('/');
 
 const RULE_NODES = new Set(['one', 'all', 'prl']);
 const BRANCH_NODES = new Set(['markov', 'sequence']);
-const UNSUPPORTED_NODES = new Set(['path', 'map', 'convolution', 'convchain', 'wfc']);
+const UNSUPPORTED_NODES = new Set(['path', 'map', 'convchain', 'wfc']);
+const CONVOLUTION_ATTRS = ['neighborhood', 'periodic', 'steps', 'comment'];
+const CONVOLUTION_RULE_ATTRS = ['in', 'out', 'p', 'values', 'sum'];
 const UNSUPPORTED_CHILDREN = new Set(['field', 'observe']);
 
 const ROOT_ATTRS = ['values', 'origin'];
@@ -193,6 +198,68 @@ export function programFromXml(source: string): XmlParseResult {
       return node;
     }
 
+    if (el.name === 'convolution') {
+      const neighborhood = el.attributes.get('neighborhood');
+      if (neighborhood === undefined) {
+        issues.push({
+          message: '<convolution> needs a neighborhood (Moore or VonNeumann)',
+          line: el.line,
+          path,
+        });
+      }
+      const node: ConvolutionNodeDef = {
+        kind: 'convolution',
+        neighborhood: (neighborhood ?? 'Moore') as ConvolutionNodeDef['neighborhood'],
+        rules: [],
+      };
+      if (readBool(el, 'periodic')) node.periodic = true;
+      const steps = readNumber(el, 'steps', path, true);
+      // MarkovJunior uses -1 for "no limit".
+      if (steps !== undefined && steps > 0) node.steps = steps;
+      if (comment !== undefined) node.comment = comment;
+
+      const readConvRule = (ruleEl: XmlElement, rule?: number): void => {
+        const at = { line: ruleEl.line, path, ...(rule !== undefined && { rule }) };
+        const inp = ruleEl.attributes.get('in');
+        const out = ruleEl.attributes.get('out');
+        if (inp === undefined || out === undefined) {
+          issues.push({ message: 'convolution rule needs in and out', ...at });
+          return;
+        }
+        const def: ConvolutionRuleDef = { in: inp, out };
+        const p = readNumber(ruleEl, 'p', path, false);
+        if (p !== undefined) def.p = p;
+        // On the root element `values` is the alphabet, never a rule's counted symbols.
+        const vals = ruleEl === rootEl ? undefined : ruleEl.attributes.get('values');
+        const sum = ruleEl.attributes.get('sum');
+        if (vals !== undefined) def.values = vals;
+        if (sum !== undefined) def.sum = sum;
+        node.rules.push(def);
+      };
+
+      const ruleEls = el.children.filter((c) => c.name === 'rule');
+      for (const child of el.children) {
+        if (child.name !== 'rule') {
+          issues.push({
+            message: `unexpected <${child.name}> inside <convolution>`,
+            line: child.line,
+            path,
+          });
+        }
+      }
+      if (ruleEls.length > 0) {
+        checkAttributes(el, [...CONVOLUTION_ATTRS, ...extra], path);
+        ruleEls.forEach((ruleEl, r) => {
+          checkAttributes(ruleEl, CONVOLUTION_RULE_ATTRS, path);
+          readConvRule(ruleEl, r);
+        });
+      } else {
+        checkAttributes(el, [...CONVOLUTION_ATTRS, ...CONVOLUTION_RULE_ATTRS, ...extra], path);
+        readConvRule(el);
+      }
+      return node;
+    }
+
     const message = UNSUPPORTED_NODES.has(el.name)
       ? `<${el.name}> nodes are not supported yet`
       : `unknown node type <${el.name}>`;
@@ -253,6 +320,37 @@ export function programToXml(program: Program): string {
       out.push(...children);
       for (const child of node.children) emit(child, depth + 1, [], []);
       out.push(`${pad}</${node.kind}>`);
+      return;
+    }
+
+    if (isConvolution(node)) {
+      const convAttrs = (r: ConvolutionRuleDef): [string, string | number | undefined][] => [
+        ['in', r.in],
+        ['out', r.out],
+        ['p', r.p],
+        ['values', r.values],
+        ['sum', r.sum],
+      ];
+      // A root rule that counts symbols can't be inline: its `values` would clash with the alphabet.
+      const single =
+        node.rules.length === 1 && !(rootAttrs.length > 0 && node.rules[0]!.values !== undefined);
+      head = `<convolution${attrs([
+        ...rootAttrs,
+        ['neighborhood', node.neighborhood],
+        ...(single ? convAttrs(node.rules[0]!) : []),
+        ['periodic', node.periodic ? 'True' : undefined],
+        ['steps', node.steps],
+        ['comment', node.comment],
+      ])}`;
+      if (!single)
+        for (const r of node.rules) children.push(`${childPad}<rule${attrs(convAttrs(r))}/>`);
+      if (children.length === 0) {
+        out.push(`${pad}${head}/>`);
+        return;
+      }
+      out.push(`${pad}${head}>`);
+      out.push(...children);
+      out.push(`${pad}</convolution>`);
       return;
     }
 

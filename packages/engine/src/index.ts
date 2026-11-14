@@ -5,6 +5,9 @@ export type { Rng } from './rng';
 
 export type {
   BranchNodeDef,
+  ConvolutionNodeDef,
+  ConvolutionRuleDef,
+  Neighborhood,
   BranchNodeKind,
   NodeDef,
   NodePath,
@@ -14,7 +17,8 @@ export type {
   RuleNodeKind,
   UnionDef,
 } from './program';
-export { isBranch, isRuleNode, nodeAt } from './program';
+export { isBranch, isConvolution, isRuleNode, nodeAt } from './program';
+export { parseSum, MAX_SUM } from './convolution-sum';
 
 export { ProgramError, formatIssue } from './errors';
 export type { Issue } from './errors';

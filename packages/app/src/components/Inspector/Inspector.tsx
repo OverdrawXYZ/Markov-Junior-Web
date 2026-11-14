@@ -2,7 +2,10 @@ import {
   DEFAULT_SYMMETRY,
   effectiveSymmetry,
   isBranch,
+  isConvolution,
+  isRuleNode,
   nodeAt,
+  type Neighborhood,
   SYMMETRY_NAMES,
   type NodeDef,
   type NodePath,
@@ -10,15 +13,14 @@ import {
 } from '@mj/engine';
 import {
   addRule,
-  BRANCH_KINDS,
   duplicateNode,
   duplicateRule,
+  kindFamily,
   moveNode,
   moveRule,
   parentOf,
   removeNode,
   removeRule,
-  RULE_KINDS,
   setKind,
   unwrapNode,
   updateNode,
@@ -28,6 +30,7 @@ import { KIND_HINT, SYMMETRY_LABELS } from '../../editor/labels';
 import { useApp } from '../../store/app';
 import { NumberField } from '../NumberField/NumberField';
 import { PatternView } from '../PatternView/PatternView';
+import { ConvolutionEditor } from '../ConvolutionEditor/ConvolutionEditor';
 import { RuleEditor } from '../RuleEditor/RuleEditor';
 import styles from './Inspector.module.css';
 
@@ -228,7 +231,8 @@ export function Inspector() {
       i.path?.join('/') === key &&
       (selection.rule === undefined || i.rule === undefined || i.rule === selection.rule),
   );
-  const family = isBranch(node) ? BRANCH_KINDS : RULE_KINDS;
+  const family = kindFamily(node.kind);
+  const conv = isConvolution(node);
   // What this node would get from its ancestors if it set no symmetry itself.
   const inheritedForNode =
     path.length === 0 ? DEFAULT_SYMMETRY : effectiveSymmetry(program, parentOf(path));
@@ -288,36 +292,78 @@ export function Inspector() {
                 edit((p) => updateNode(p, path, { steps: n > 0 ? Math.round(n) : undefined }))
               }
             />
-            <span className={styles.muted}>0 = until no matches</span>
+            <span className={styles.muted}>
+              0 = until {conv ? 'nothing changes' : 'no matches'}
+            </span>
           </label>
         )}
 
-        <label className={styles.field}>
-          <span className={styles.label}>Symmetry</span>
-          <select
-            value={node.symmetry ?? ''}
-            aria-label="Node symmetry"
-            onChange={(e) =>
-              edit((p) => updateNode(p, path, { symmetry: e.target.value || undefined }))
-            }
-          >
-            <option value="">
-              Inherit — {SYMMETRY_LABELS[inheritedForNode] ?? inheritedForNode}
-            </option>
-            {SYMMETRY_NAMES.map((name) => (
-              <option key={name} value={name}>
-                {name} {SYMMETRY_LABELS[name]}
+        {conv ? (
+          <>
+            <label className={styles.field}>
+              <span className={styles.label}>Neighbours</span>
+              <select
+                value={node.neighborhood}
+                aria-label="Neighbourhood"
+                onChange={(e) =>
+                  edit((p) => updateNode(p, path, { neighborhood: e.target.value as Neighborhood }))
+                }
+              >
+                <option value="Moore">8 around (Moore)</option>
+                <option value="VonNeumann">4 sides (von Neumann)</option>
+              </select>
+            </label>
+            <label className={styles.field}>
+              <span className={styles.label}>Edges</span>
+              <span className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={node.periodic ?? false}
+                  onChange={(e) => edit((p) => updateNode(p, path, { periodic: e.target.checked }))}
+                />
+                Wrap around
+              </span>
+            </label>
+          </>
+        ) : (
+          <label className={styles.field}>
+            <span className={styles.label}>Symmetry</span>
+            <select
+              value={node.symmetry ?? ''}
+              aria-label="Node symmetry"
+              onChange={(e) =>
+                edit((p) => updateNode(p, path, { symmetry: e.target.value || undefined }))
+              }
+            >
+              <option value="">
+                Inherit — {SYMMETRY_LABELS[inheritedForNode] ?? inheritedForNode}
               </option>
-            ))}
-          </select>
-        </label>
+              {SYMMETRY_NAMES.map((name) => (
+                <option key={name} value={name}>
+                  {name} {SYMMETRY_LABELS[name]}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <NodeActions program={program} path={path} node={node} />
       </div>
 
       {!isBranch(node) && <RuleList program={program} path={path} selectedRule={selection.rule} />}
 
-      {!isBranch(node) && selection.rule !== undefined && (
+      {conv && selection.rule !== undefined && (
+        <div className={styles.section}>
+          <h3 className={styles.sectionTitle}>Rule {selection.rule + 1}</h3>
+          <ConvolutionEditor
+            key={`${key}#${selection.rule}`}
+            program={program}
+            path={path}
+            index={selection.rule}
+          />
+        </div>
+      )}
+      {isRuleNode(node) && selection.rule !== undefined && (
         <div className={styles.section}>
           <h3 className={styles.sectionTitle}>Rule {selection.rule + 1}</h3>
           <RuleEditor
@@ -329,7 +375,7 @@ export function Inspector() {
         </div>
       )}
       {!isBranch(node) && selection.rule === undefined && node.rules.length > 0 && (
-        <p className={styles.muted}>Pick a rule above to paint it.</p>
+        <p className={styles.muted}>Pick a rule above to edit it.</p>
       )}
     </div>
   );

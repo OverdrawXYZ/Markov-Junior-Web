@@ -5,6 +5,10 @@
  */
 import {
   isBranch,
+  isConvolution,
+  type ConvolutionNodeDef,
+  type ConvolutionRuleDef,
+  type Neighborhood,
   nodeAt,
   type BranchNodeDef,
   type BranchNodeKind,
@@ -19,7 +23,22 @@ import {
 
 export const RULE_KINDS: readonly RuleNodeKind[] = ['one', 'all', 'prl'];
 export const BRANCH_KINDS: readonly BranchNodeKind[] = ['markov', 'sequence'];
-export const NODE_KINDS: readonly NodeDef['kind'][] = [...RULE_KINDS, ...BRANCH_KINDS];
+export const NODE_KINDS: readonly NodeDef['kind'][] = [
+  ...RULE_KINDS,
+  ...BRANCH_KINDS,
+  'convolution',
+];
+
+/** Nodes that hold a list of rules. */
+export type RulesNode = RuleNodeDef | ConvolutionNodeDef;
+export type AnyRule = RuleDef | ConvolutionRuleDef;
+
+/** Kinds a node can be switched between without losing its contents. */
+export function kindFamily(kind: NodeDef['kind']): readonly NodeDef['kind'][] {
+  if (isRuleKind(kind)) return RULE_KINDS;
+  if (kind === 'convolution') return ['convolution'];
+  return BRANCH_KINDS;
+}
 
 export const isRuleKind = (kind: NodeDef['kind']): kind is RuleNodeKind =>
   (RULE_KINDS as readonly string[]).includes(kind);
@@ -45,8 +64,10 @@ export function mapNode(program: Program, path: NodePath, fn: (node: NodeDef) =>
     const i = path[depth]!;
     const child = node.children[i];
     if (!child) return node;
+    const next = rec(child, depth + 1);
+    if (next === child) return node; // unchanged: keep identity so no-op edits are detectable
     const children = node.children.slice();
-    children[i] = rec(child, depth + 1);
+    children[i] = next;
     return { ...node, children };
   };
   const root = rec(program.root, 0);
@@ -64,7 +85,7 @@ function mapBranch(
 function mapRuleNode(
   program: Program,
   path: NodePath,
-  fn: (node: RuleNodeDef) => RuleNodeDef,
+  fn: (node: RulesNode) => RulesNode,
 ): Program {
   return mapNode(program, path, (n) => (isBranch(n) ? n : fn(n)));
 }
@@ -74,8 +95,19 @@ export function defaultRule(program: Program): RuleDef {
   return { in: a, out: program.values[1] ?? a };
 }
 
+/** A starting convolution rule: the first symbol turns into the second next to one. */
+export function defaultConvolutionRule(program: Program): ConvolutionRuleDef {
+  const a = program.values[0] ?? 'B';
+  const b = program.values[1] ?? a;
+  return { in: a, out: b, values: b, sum: '1..8' };
+}
+
 export function newNode(kind: NodeDef['kind'], program: Program): NodeDef {
-  return isRuleKind(kind) ? { kind, rules: [defaultRule(program)] } : { kind, children: [] };
+  if (isRuleKind(kind)) return { kind, rules: [defaultRule(program)] };
+  if (kind === 'convolution') {
+    return { kind, neighborhood: 'Moore', rules: [defaultConvolutionRule(program)] };
+  }
+  return { kind, children: [] };
 }
 
 /** Patch simple node fields. `undefined` values remove the field. */
@@ -86,13 +118,19 @@ export function updateNode(
     symmetry?: string | undefined;
     comment?: string | undefined;
     steps?: number | undefined;
+    neighborhood?: Neighborhood | undefined;
+    periodic?: boolean | undefined;
   },
 ): Program {
   return mapNode(program, path, (node) => {
     const next: Record<string, unknown> = { ...node };
+    const conv = isConvolution(node);
     for (const [k, v] of Object.entries(patch)) {
       if (k === 'steps' && isBranch(node)) continue;
-      if (v === undefined || v === '') delete next[k];
+      if (k === 'symmetry' && conv) continue;
+      if ((k === 'neighborhood' || k === 'periodic') && !conv) continue;
+      if (k === 'neighborhood' && v === undefined) continue;
+      if (v === undefined || v === '' || v === false) delete next[k];
       else next[k] = v;
     }
     return next as unknown as NodeDef;
@@ -102,7 +140,7 @@ export function updateNode(
 /** Change kind within the same family (one/all/prl or markov/sequence). */
 export function setKind(program: Program, path: NodePath, kind: NodeDef['kind']): Program {
   return mapNode(program, path, (node) => {
-    if (isRuleKind(kind) !== !isBranch(node)) return node;
+    if (node.kind === kind || !kindFamily(node.kind).includes(kind)) return node;
     return { ...node, kind } as NodeDef;
   });
 }
@@ -229,15 +267,26 @@ export function unwrapNode(program: Program, path: NodePath): Program {
 
 // ---------------------------------------------------------------- rules
 
-export function addRule(program: Program, path: NodePath, rule = defaultRule(program)): Program {
-  return mapRuleNode(program, path, (n) => ({ ...n, rules: [...n.rules, rule] }));
+export function addRule(program: Program, path: NodePath, rule?: AnyRule): Program {
+  return mapRuleNode(program, path, (n) => {
+    const next =
+      rule ?? (isConvolution(n) ? defaultConvolutionRule(program) : defaultRule(program));
+    return { ...n, rules: [...n.rules, next] } as RulesNode;
+  });
 }
 
 export function updateRule(
   program: Program,
   path: NodePath,
   index: number,
-  patch: { in?: string; out?: string; p?: number | undefined; symmetry?: string | undefined },
+  patch: {
+    in?: string;
+    out?: string;
+    p?: number | undefined;
+    symmetry?: string | undefined;
+    values?: string | undefined;
+    sum?: string | undefined;
+  },
 ): Program {
   return mapRuleNode(program, path, (n) => {
     const rule = n.rules[index];
@@ -247,17 +296,18 @@ export function updateRule(
       if (v === undefined) delete next[k];
       else next[k] = v;
     }
-    const rules = n.rules.slice();
-    rules[index] = next as unknown as RuleDef;
-    return { ...n, rules };
+    const rules: AnyRule[] = n.rules.slice();
+    rules[index] = next as unknown as AnyRule;
+    return { ...n, rules } as RulesNode;
   });
 }
 
 export function removeRule(program: Program, path: NodePath, index: number): Program {
-  return mapRuleNode(program, path, (n) => ({
-    ...n,
-    rules: n.rules.filter((_, i) => i !== index),
-  }));
+  return mapRuleNode(
+    program,
+    path,
+    (n) => ({ ...n, rules: (n.rules as AnyRule[]).filter((_, i) => i !== index) }) as RulesNode,
+  );
 }
 
 export function duplicateRule(program: Program, path: NodePath, index: number): Program {
@@ -311,22 +361,24 @@ export const cellAt = (pattern: string, x: number, y: number): string | undefine
 
 // ---------------------------------------------------------------- symbols
 
-function mapRules(program: Program, fn: (rule: RuleDef) => RuleDef): NodeDef {
-  const rec = (node: NodeDef): NodeDef =>
-    isBranch(node)
-      ? { ...node, children: node.children.map(rec) }
-      : { ...node, rules: node.rules.map(fn) };
+/** Apply `fn` to every rule (of rule and convolution nodes). */
+function mapRules(program: Program, fn: <R extends AnyRule>(rule: R) => R): NodeDef {
+  const rec = (node: NodeDef): NodeDef => {
+    if (isBranch(node)) return { ...node, children: node.children.map(rec) };
+    if (isConvolution(node)) return { ...node, rules: node.rules.map(fn) };
+    return { ...node, rules: node.rules.map(fn) };
+  };
   return rec(program.root);
 }
 
-function allRules(node: NodeDef): RuleDef[] {
+function allRules(node: NodeDef): AnyRule[] {
   return isBranch(node) ? node.children.flatMap(allRules) : node.rules;
 }
 
 /** How many rules (plus unions) refer to symbol `ch`. */
 export function symbolUsage(program: Program, ch: string): number {
   const rules = allRules(program.root).filter(
-    (r) => r.in.includes(ch) || r.out.includes(ch),
+    (r) => r.in.includes(ch) || r.out.includes(ch) || ('values' in r && r.values?.includes(ch)),
   ).length;
   const unions = (program.unions ?? []).filter(
     (u) => u.values.includes(ch) || u.symbol === ch,
@@ -366,7 +418,11 @@ export function renameSymbol(program: Program, from: string, to: string): Progra
   const next: Program = {
     ...program,
     values: swap(program.values),
-    root: mapRules(program, (r) => ({ ...r, in: swap(r.in), out: swap(r.out) })),
+    root: mapRules(program, (r) => {
+      const next = { ...r, in: swap(r.in), out: swap(r.out) };
+      if ('values' in next && next.values !== undefined) next.values = swap(next.values);
+      return next;
+    }),
   };
   if (unions) next.unions = unions;
   return next;

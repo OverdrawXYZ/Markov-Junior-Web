@@ -3,9 +3,19 @@ import { ProgramError } from './errors';
 import type { Grid } from './grid';
 import { AllNode } from './nodes/all';
 import { Branch, MarkovNode, SequenceNode, type Node } from './nodes/node';
+import { ConvolutionNode, KERNELS_2D } from './nodes/convolution';
 import { OneNode } from './nodes/one';
+import { parseSum } from './convolution-sum';
 import { PrlNode } from './nodes/prl';
-import { isBranch, type NodeDef, type NodePath, type Program, type RuleDef } from './program';
+import {
+  isBranch,
+  isConvolution,
+  type ConvolutionNodeDef,
+  type NodeDef,
+  type NodePath,
+  type Program,
+  type RuleDef,
+} from './program';
 import { parsePattern, Rule, WILDCARD_OUT } from './rule';
 import { FULL_SQUARE_SYMMETRY, resolveSymmetry, type SymmetryMask } from './symmetry';
 import { validateProgram } from './validate';
@@ -26,6 +36,7 @@ export function compileProgram(program: Program, ctx: Context): Branch {
 }
 
 function compileNode(def: NodeDef, path: NodePath, inherited: SymmetryMask, ctx: Context): Node {
+  if (isConvolution(def)) return compileConvolution(def, path, ctx);
   const symmetry = resolveSymmetry(def.symmetry, inherited)!;
 
   if (isBranch(def)) {
@@ -60,4 +71,31 @@ export function compileRule(def: RuleDef, grid: Grid): Rule {
     ch === '*' ? WILDCARD_OUT : grid.values.get(ch)!,
   );
   return new Rule(input, output, inp.MX, inp.MY, inp.MZ, grid.C, def.p ?? 1);
+}
+
+function compileConvolution(
+  def: ConvolutionNodeDef,
+  path: NodePath,
+  ctx: Context,
+): ConvolutionNode {
+  const { grid } = ctx;
+  const rules = def.rules.map((r) => {
+    const sums = r.sum === undefined ? null : parseSum(r.sum);
+    return {
+      input: grid.values.get(r.in)!,
+      output: grid.values.get(r.out)!,
+      p: r.p ?? 1,
+      values:
+        r.values === undefined ? null : Int32Array.from(r.values, (ch) => grid.values.get(ch)!),
+      sums: typeof sums === 'string' ? null : sums,
+    };
+  });
+  return new ConvolutionNode(
+    ctx,
+    path,
+    rules,
+    KERNELS_2D[def.neighborhood],
+    def.periodic ?? false,
+    def.steps ?? 0,
+  );
 }

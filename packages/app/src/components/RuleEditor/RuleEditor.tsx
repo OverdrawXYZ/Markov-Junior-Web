@@ -1,7 +1,7 @@
 import { useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from 'react';
 import {
   effectiveSymmetry,
-  isBranch,
+  isRuleNode,
   nodeAt,
   ruleVariants,
   SYMMETRY_NAMES,
@@ -146,10 +146,10 @@ interface Props {
 export function RuleEditor({ program, path, index }: Props) {
   const edit = useApp((s) => s.edit);
   const node = nodeAt(program.root, path);
-  const rule = node && !isBranch(node) ? node.rules[index] : undefined;
+  const rule = node && isRuleNode(node) ? node.rules[index] : undefined;
   const [brushChoice, setBrush] = useState(program.values[1] ?? program.values[0] ?? '*');
   const strokeId = useRef(0);
-  if (!node || isBranch(node) || !rule) return null;
+  if (!node || !isRuleNode(node) || !rule) return null;
 
   const isUnion = (ch: string) => (program.unions ?? []).some((u) => u.symbol === ch);
   const brush =
@@ -166,7 +166,7 @@ export function RuleEditor({ program, path, index }: Props) {
     edit(
       (p) => {
         const n = nodeAt(p.root, path);
-        const r = n && !isBranch(n) ? n.rules[index] : undefined;
+        const r = n && isRuleNode(n) ? n.rules[index] : undefined;
         const changes = r && patch(r);
         return changes ? updateRule(p, path, index, changes) : p;
       },

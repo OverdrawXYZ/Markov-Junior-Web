@@ -4,6 +4,8 @@ import type { Example } from './index';
 /** Cap for programs that never halt (e.g. Snake). */
 const MAX_STEPS = 20_000;
 export const THUMBNAIL_SEED = 1;
+/** Per-thumbnail time limit, so a slow, never-halting example can't stall the page. */
+const TIME_BUDGET_MS = 150;
 
 const cache = new Map<string, Promise<string | null>>();
 let queue: Promise<unknown> = Promise.resolve();
@@ -20,7 +22,12 @@ function render(example: Example): string | null {
     height: example.size,
     seed: THUMBNAIL_SEED,
   });
-  const { stepCount } = run.runToEnd(MAX_STEPS);
+  // Run until halted, the step cap, or the time budget (some programs never halt).
+  const start = performance.now();
+  let stepCount = 0;
+  while (!run.halted && stepCount < MAX_STEPS && performance.now() - start < TIME_BUDGET_MS) {
+    stepCount = run.step(64).stepCount;
+  }
   // Programs that end as one solid colour (e.g. Growth) are more telling mid-way.
   if (run.state.every((v) => v === run.state[0])) {
     run.reset();

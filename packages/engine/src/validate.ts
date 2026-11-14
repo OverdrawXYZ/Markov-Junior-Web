@@ -1,6 +1,16 @@
 import type { Issue } from './errors';
 import { MAX_SYMBOLS } from './grid';
-import { isBranch, type NodeDef, type NodePath, type Program, type RuleDef } from './program';
+import { parseSum } from './convolution-sum';
+import { KERNELS_2D } from './nodes/convolution';
+import {
+  isBranch,
+  isConvolution,
+  type ConvolutionNodeDef,
+  type NodeDef,
+  type NodePath,
+  type Program,
+  type RuleDef,
+} from './program';
 import { parsePattern } from './rule';
 import { isSymmetryName } from './symmetry';
 
@@ -39,7 +49,7 @@ export function validateProgram(program: Program): Issue[] {
   }
 
   const visit = (node: NodeDef, path: NodePath): void => {
-    if (node.symmetry !== undefined && !isSymmetryName(node.symmetry)) {
+    if ('symmetry' in node && node.symmetry !== undefined && !isSymmetryName(node.symmetry)) {
       issues.push({ message: `unknown symmetry ${node.symmetry}`, path });
     }
     if (isBranch(node)) {
@@ -48,6 +58,10 @@ export function validateProgram(program: Program): Issue[] {
     }
     if (node.steps !== undefined && !(Number.isInteger(node.steps) && node.steps >= 0)) {
       issues.push({ message: `steps must be a non-negative integer, got ${node.steps}`, path });
+    }
+    if (isConvolution(node)) {
+      validateConvolution(node, path, seen, issues);
+      return;
     }
     if (node.rules.length === 0) issues.push({ message: `${node.kind} node has no rules`, path });
     node.rules.forEach((rule, r) => validateRule(rule, path, r, inputSymbols, seen, issues));
@@ -94,4 +108,47 @@ function validateRule(
   if (rule.symmetry !== undefined && !isSymmetryName(rule.symmetry)) {
     issues.push({ message: `unknown symmetry ${rule.symmetry}`, ...at });
   }
+}
+
+function validateConvolution(
+  node: ConvolutionNodeDef,
+  path: NodePath,
+  values: ReadonlySet<string>,
+  issues: Issue[],
+): void {
+  if (!Object.hasOwn(KERNELS_2D, node.neighborhood)) {
+    issues.push({
+      message: `unknown neighborhood "${node.neighborhood}" (use Moore or VonNeumann)`,
+      path,
+    });
+  }
+  if (node.rules.length === 0) issues.push({ message: 'convolution node has no rules', path });
+  node.rules.forEach((rule, r) => {
+    const at = { path, rule: r };
+    for (const [name, ch] of [
+      ['input', rule.in],
+      ['output', rule.out],
+    ] as const) {
+      if ([...ch].length !== 1) issues.push({ message: `${name} must be a single symbol`, ...at });
+      else if (!values.has(ch))
+        issues.push({ message: `${name} symbol ${ch} is not a value`, ...at });
+    }
+    if (rule.p !== undefined && !(rule.p >= 0 && rule.p <= 1)) {
+      issues.push({ message: `p must be between 0 and 1, got ${rule.p}`, ...at });
+    }
+    if ((rule.values === undefined) !== (rule.sum === undefined)) {
+      issues.push({ message: 'values and sum must be given together', ...at });
+    }
+    if (rule.values !== undefined) {
+      if (rule.values.length === 0)
+        issues.push({ message: 'values must list at least one symbol', ...at });
+      for (const ch of new Set(rule.values)) {
+        if (!values.has(ch)) issues.push({ message: `counted symbol ${ch} is not a value`, ...at });
+      }
+    }
+    if (rule.sum !== undefined) {
+      const parsed = parseSum(rule.sum);
+      if (typeof parsed === 'string') issues.push({ message: parsed, ...at });
+    }
+  });
 }
