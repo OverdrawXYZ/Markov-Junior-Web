@@ -6,8 +6,10 @@
 import {
   isBranch,
   isConvolution,
+  isRuleNode,
   type ConvolutionNodeDef,
   type ConvolutionRuleDef,
+  type FieldDef,
   type Neighborhood,
   nodeAt,
   type BranchNodeDef,
@@ -120,6 +122,7 @@ export function updateNode(
     steps?: number | undefined;
     neighborhood?: Neighborhood | undefined;
     periodic?: boolean | undefined;
+    temperature?: number | undefined;
   },
 ): Program {
   return mapNode(program, path, (node) => {
@@ -129,6 +132,11 @@ export function updateNode(
       if (k === 'steps' && isBranch(node)) continue;
       if (k === 'symmetry' && conv) continue;
       if ((k === 'neighborhood' || k === 'periodic') && !conv) continue;
+      if (k === 'temperature' && !isRuleNode(node)) continue;
+      if (k === 'temperature' && v === 0) {
+        delete next[k];
+        continue;
+      }
       if (k === 'neighborhood' && v === undefined) continue;
       if (v === undefined || v === '' || v === false) delete next[k];
       else next[k] = v;
@@ -371,6 +379,11 @@ function mapRules(program: Program, fn: <R extends AnyRule>(rule: R) => R): Node
   return rec(program.root);
 }
 
+function allFields(node: NodeDef): FieldDef[] {
+  if (isBranch(node)) return node.children.flatMap(allFields);
+  return isRuleNode(node) ? (node.fields ?? []) : [];
+}
+
 function allRules(node: NodeDef): AnyRule[] {
   return isBranch(node) ? node.children.flatMap(allRules) : node.rules;
 }
@@ -383,7 +396,10 @@ export function symbolUsage(program: Program, ch: string): number {
   const unions = (program.unions ?? []).filter(
     (u) => u.values.includes(ch) || u.symbol === ch,
   ).length;
-  return rules + unions;
+  const fields = allFields(program.root).filter((f) =>
+    [f.for, f.on, f.to ?? '', f.from ?? ''].some((part) => part.includes(ch)),
+  ).length;
+  return rules + unions + fields;
 }
 
 /** Characters that may not be used as a new symbol or union. */
@@ -415,10 +431,23 @@ export function renameSymbol(program: Program, from: string, to: string): Progra
   if ((!isValue && !isUnion) || isReservedChar(program, to)) return program;
   const swap = (s: string) => [...s].map((c) => (c === from ? to : c)).join('');
   const unions = program.unions?.map((u) => ({ symbol: swap(u.symbol), values: swap(u.values) }));
+  const renameFields = (node: NodeDef): NodeDef => {
+    if (isBranch(node)) return { ...node, children: node.children.map(renameFields) };
+    if (!isRuleNode(node) || !node.fields) return node;
+    return {
+      ...node,
+      fields: node.fields.map((f) => {
+        const g: FieldDef = { ...f, for: swap(f.for), on: swap(f.on) };
+        if (f.to !== undefined) g.to = swap(f.to);
+        if (f.from !== undefined) g.from = swap(f.from);
+        return g;
+      }),
+    };
+  };
   const next: Program = {
     ...program,
     values: swap(program.values),
-    root: mapRules(program, (r) => {
+    root: mapRules({ ...program, root: renameFields(program.root) }, (r) => {
       const next = { ...r, in: swap(r.in), out: swap(r.out) };
       if ('values' in next && next.values !== undefined) next.values = swap(next.values);
       return next;
@@ -471,4 +500,56 @@ export function removeUnion(program: Program, index: number): Program {
   const next: Program = { ...program, unions };
   if (unions.length === 0) delete next.unions;
   return next;
+}
+
+// ---------------------------------------------------------------- fields
+
+function mapFields(
+  program: Program,
+  path: NodePath,
+  fn: (fields: FieldDef[]) => FieldDef[],
+): Program {
+  return mapNode(program, path, (n) => {
+    if (!isRuleNode(n)) return n;
+    const fields = fn(n.fields ?? []);
+    const next: RuleNodeDef = { ...n, fields };
+    if (fields.length === 0) delete next.fields;
+    return next;
+  });
+}
+
+/** A starting field: guide the second symbol towards the third (or first) through the first. */
+export function defaultField(program: Program): FieldDef {
+  const v = program.values;
+  return { for: v[1] ?? v[0] ?? 'B', to: v[2] ?? v[0] ?? 'B', on: v[0] ?? 'B' };
+}
+
+export function addField(program: Program, path: NodePath, field = defaultField(program)): Program {
+  return mapFields(program, path, (fields) => [...fields, field]);
+}
+
+/** Patch a field; `undefined` removes optional keys. Setting `to` clears `from` and vice versa. */
+export function updateField(
+  program: Program,
+  path: NodePath,
+  index: number,
+  patch: Partial<Record<keyof FieldDef, string | boolean | undefined>>,
+): Program {
+  return mapFields(program, path, (fields) =>
+    fields.map((f, i) => {
+      if (i !== index) return f;
+      const next: Record<string, unknown> = { ...f };
+      if ('to' in patch && patch.to !== undefined) delete next.from;
+      if ('from' in patch && patch.from !== undefined) delete next.to;
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === undefined || v === false) delete next[k];
+        else next[k] = v;
+      }
+      return next as unknown as FieldDef;
+    }),
+  );
+}
+
+export function removeField(program: Program, path: NodePath, index: number): Program {
+  return mapFields(program, path, (fields) => fields.filter((_, i) => i !== index));
 }

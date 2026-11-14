@@ -31,6 +31,7 @@ import { useApp } from '../../store/app';
 import { NumberField } from '../NumberField/NumberField';
 import { PatternView } from '../PatternView/PatternView';
 import { ConvolutionEditor } from '../ConvolutionEditor/ConvolutionEditor';
+import { FieldsEditor } from '../FieldsEditor/FieldsEditor';
 import { RuleEditor } from '../RuleEditor/RuleEditor';
 import styles from './Inspector.module.css';
 
@@ -351,6 +352,13 @@ export function Inspector() {
       </div>
 
       {!isBranch(node) && <RuleList program={program} path={path} selectedRule={selection.rule} />}
+
+      {isRuleNode(node) && node.kind !== 'prl' && (
+        <div className={styles.section}>
+          <h3 className={styles.sectionTitle}>Fields</h3>
+          <FieldsEditor program={program} path={path} />
+        </div>
+      )}
 
       {conv && selection.rule !== undefined && (
         <div className={styles.section}>

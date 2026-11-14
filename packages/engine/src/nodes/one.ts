@@ -1,12 +1,19 @@
 import type { Context } from '../context';
 import type { NodePath } from '../program';
 import { WILDCARD_OUT, type Rule } from '../rule';
-import { RuleNode } from './rule-node';
+import { deltaPointwise } from '../field';
+import { RuleNode, type RuleNodeOptions } from './rule-node';
 
 /** Applies one uniformly random match per turn. */
 export class OneNode extends RuleNode {
-  constructor(ctx: Context, path: NodePath, rules: Rule[], steps: number) {
-    super(ctx, path, rules, steps);
+  constructor(
+    ctx: Context,
+    path: NodePath,
+    rules: Rule[],
+    steps: number,
+    options?: RuleNodeOptions,
+  ) {
+    super(ctx, path, rules, steps, options);
     const cells = ctx.grid.state.length;
     this.matchMask = rules.map(() => new Uint8Array(cells));
   }
@@ -40,6 +47,7 @@ export class OneNode extends RuleNode {
    * moved just past the live region so it stays readable — or -1.
    */
   private randomMatch(): number {
+    if (this.potentials) return this.bestMatch();
     const { grid, rng } = this.ctx;
     const { MX, MY } = grid;
     const d = this.matchData;
@@ -64,6 +72,51 @@ export class OneNode extends RuleNode {
       if (grid.matches(this.rules[r]!, x, y, z)) return lastK;
     }
     return -1;
+  }
+
+  /**
+   * With fields: the live match whose heuristic key is highest (dropping stale
+   * matches on the way). The chosen match stays listed; it goes stale once applied.
+   */
+  private bestMatch(): number {
+    const { grid } = this.ctx;
+    const { MX, MY, state } = grid;
+    const d = this.matchData;
+    let max = -1000;
+    let argmax = -1;
+    let first = 0;
+    let firstComputed = false;
+    for (let k = 0; k < this.matchCount; k++) {
+      const o = k * 4;
+      const r = d[o]!;
+      const x = d[o + 1]!;
+      const y = d[o + 2]!;
+      const z = d[o + 3]!;
+      const rule = this.rules[r]!;
+      if (!grid.matches(rule, x, y, z)) {
+        this.matchMask![r]![x + y * MX + z * MX * MY] = 0;
+        const last = (this.matchCount - 1) * 4;
+        d[o] = d[last]!;
+        d[o + 1] = d[last + 1]!;
+        d[o + 2] = d[last + 2]!;
+        d[o + 3] = d[last + 3]!;
+        this.matchCount--;
+        k--;
+        continue;
+      }
+      const h = deltaPointwise(state, rule, x, y, z, this.fields, this.potentials!, MX, MY);
+      if (h === null) continue;
+      if (!firstComputed) {
+        first = h;
+        firstComputed = true;
+      }
+      const key = this.heuristicKey(h, first);
+      if (key > max) {
+        max = key;
+        argmax = k;
+      }
+    }
+    return argmax >= 0 ? argmax * 4 : -1;
   }
 
   private apply(rule: Rule, x: number, y: number, z: number): void {

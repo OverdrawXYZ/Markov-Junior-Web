@@ -4,6 +4,7 @@ import {
   isConvolution,
   type ConvolutionNodeDef,
   type ConvolutionRuleDef,
+  type FieldDef,
   type BranchNodeDef,
   type NodeDef,
   type NodePath,
@@ -29,11 +30,12 @@ const BRANCH_NODES = new Set(['markov', 'sequence']);
 const UNSUPPORTED_NODES = new Set(['path', 'map', 'convchain', 'wfc']);
 const CONVOLUTION_ATTRS = ['neighborhood', 'periodic', 'steps', 'comment'];
 const CONVOLUTION_RULE_ATTRS = ['in', 'out', 'p', 'values', 'sum'];
-const UNSUPPORTED_CHILDREN = new Set(['field', 'observe']);
+const UNSUPPORTED_CHILDREN = new Set(['observe']);
+const FIELD_ATTRS = ['for', 'on', 'to', 'from', 'recompute', 'essential'];
 
 const ROOT_ATTRS = ['values', 'origin'];
 const RULE_ATTRS = ['in', 'out', 'p', 'symmetry'];
-const RULE_NODE_ATTRS = ['symmetry', 'steps', 'comment'];
+const RULE_NODE_ATTRS = ['symmetry', 'steps', 'comment', 'temperature'];
 const BRANCH_ATTRS = ['symmetry', 'comment'];
 
 /** Parse MarkovJunior XML into a Program. Throws ProgramError on structural errors. */
@@ -154,10 +156,27 @@ export function programFromXml(source: string): XmlParseResult {
       if (comment !== undefined) node.comment = comment;
       const steps = readNumber(el, 'steps', path, true);
       if (steps !== undefined) node.steps = steps;
+      const temperature = readNumber(el, 'temperature', path, false);
+      if (temperature !== undefined && temperature !== 0) node.temperature = temperature;
 
       const ruleEls = el.children.filter((c) => c.name === 'rule');
       for (const child of el.children) {
         if (child.name === 'rule') continue;
+        if (child.name === 'field') {
+          checkAttributes(child, FIELD_ATTRS, path);
+          const field: FieldDef = {
+            for: child.attributes.get('for') ?? '',
+            on: (child.attributes.get('on') ?? '').replace(/ /g, ''),
+          };
+          const to = child.attributes.get('to');
+          const from = child.attributes.get('from');
+          if (to !== undefined) field.to = to.replace(/ /g, '');
+          if (from !== undefined) field.from = from.replace(/ /g, '');
+          if (readBool(child, 'recompute')) field.recompute = true;
+          if (readBool(child, 'essential')) field.essential = true;
+          (node.fields ??= []).push(field);
+          continue;
+        }
         if (child.name === 'union' && isRoot) readUnion(child);
         else if (child.name === 'union') {
           issues.push({
@@ -364,6 +383,7 @@ export function programToXml(program: Program): string {
       ...rootAttrs,
       ...(inline ? ruleAttrs(node.rules[0]!) : []),
       ['steps', node.steps],
+      ['temperature', node.temperature],
       ['symmetry', node.symmetry],
       ['comment', node.comment],
     ])}`;
@@ -371,6 +391,18 @@ export function programToXml(program: Program): string {
       for (const r of node.rules) {
         children.push(`${childPad}<rule${attrs([...ruleAttrs(r), ['symmetry', r.symmetry]])}/>`);
       }
+    }
+    for (const f of node.fields ?? []) {
+      children.push(
+        `${childPad}<field${attrs([
+          ['for', f.for],
+          ['to', f.to],
+          ['from', f.from],
+          ['on', f.on],
+          ['recompute', f.recompute ? 'True' : undefined],
+          ['essential', f.essential ? 'True' : undefined],
+        ])}/>`,
+      );
     }
     if (children.length === 0) {
       out.push(`${pad}${head}/>`);

@@ -102,9 +102,9 @@ describe('programFromXml', () => {
   });
 
   it('warns about unknown attributes instead of failing', () => {
-    const { warnings } = programFromXml('<one values="BW" in="B" out="W" temperature="1"/>');
+    const { warnings } = programFromXml('<one values="BW" in="B" out="W" colour="1"/>');
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]!.message).toContain('temperature');
+    expect(warnings[0]!.message).toContain('colour');
   });
 
   it.each([
@@ -117,10 +117,6 @@ describe('programFromXml', () => {
     [
       '<markov values="BW"><one in="B" out="W"><union symbol="?" values="BW"/></one></markov>',
       '<union> must be declared',
-    ],
-    [
-      '<markov values="BW"><one in="B" out="W"><field for="B" to="W"/></one></markov>',
-      '<field> is not supported yet',
     ],
     ['<markov values="BW"', 'unterminated tag'],
   ])('rejects %s', (xml, message) => {

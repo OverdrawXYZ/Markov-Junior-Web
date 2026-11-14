@@ -10,6 +10,7 @@ import {
   type NodePath,
   type Program,
   type RuleDef,
+  type RuleNodeDef,
 } from './program';
 import { parsePattern } from './rule';
 import { isSymmetryName } from './symmetry';
@@ -64,6 +65,13 @@ export function validateProgram(program: Program): Issue[] {
       return;
     }
     if (node.rules.length === 0) issues.push({ message: `${node.kind} node has no rules`, path });
+    if (
+      node.temperature !== undefined &&
+      !(Number.isFinite(node.temperature) && node.temperature >= 0)
+    ) {
+      issues.push({ message: `temperature must be 0 or more, got ${node.temperature}`, path });
+    }
+    validateFields(node, path, seen, issues);
     node.rules.forEach((rule, r) => validateRule(rule, path, r, inputSymbols, seen, issues));
   };
   visit(program.root, []);
@@ -151,4 +159,43 @@ function validateConvolution(
       if (typeof parsed === 'string') issues.push({ message: parsed, ...at });
     }
   });
+}
+
+function validateFields(
+  node: RuleNodeDef,
+  path: NodePath,
+  values: ReadonlySet<string>,
+  issues: Issue[],
+): void {
+  const fields = node.fields ?? [];
+  if (fields.length > 0 && node.kind === 'prl') {
+    issues.push({ message: 'fields only steer one and all nodes', path });
+  }
+  const seenFor = new Set<string>();
+  for (const f of fields) {
+    const label = `field for ${f.for || '?'}`;
+    if ([...f.for].length !== 1 || !values.has(f.for)) {
+      issues.push({ message: `${label}: "for" must be one of the symbols`, path });
+    } else if (seenFor.has(f.for)) {
+      issues.push({ message: `${label}: there is already a field for ${f.for}`, path });
+    }
+    seenFor.add(f.for);
+    if (f.on.length === 0)
+      issues.push({ message: `${label}: "on" needs at least one symbol`, path });
+    if ((f.to === undefined) === (f.from === undefined)) {
+      issues.push({ message: `${label}: give exactly one of "to" or "from"`, path });
+    }
+    for (const [attr, symbols] of [
+      ['on', f.on],
+      ['to', f.to ?? ''],
+      ['from', f.from ?? ''],
+    ] as const) {
+      for (const ch of new Set(symbols)) {
+        if (!values.has(ch))
+          issues.push({ message: `${label}: unknown symbol ${ch} in "${attr}"`, path });
+      }
+    }
+    if ((f.to ?? f.from ?? 'x') === '')
+      issues.push({ message: `${label}: "to"/"from" is empty`, path });
+  }
 }

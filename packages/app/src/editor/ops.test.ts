@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { programFromXml, programToXml, validateProgram, type Program } from '@mj/engine';
 import {
+  addField,
   addNode,
   addRule,
   addSymbol,
@@ -12,6 +13,7 @@ import {
   moveRule,
   moveSymbol,
   newNode,
+  removeField,
   removeNode,
   removeRule,
   removeSymbol,
@@ -24,6 +26,7 @@ import {
   setUnionValues,
   symbolUsage,
   unwrapNode,
+  updateField,
   updateNode,
   updateRule,
   wrapNode,
@@ -272,5 +275,31 @@ describe('convolution nodes', () => {
     expect(xml(renameSymbol(life, 'A', 'L'))).toContain(
       '<rule in="D" out="L" values="L" sum="3"/>',
     );
+  });
+});
+
+describe('fields', () => {
+  const p0 = load('<one values="BWT" in="WB" out="WW"/>');
+
+  it('adds, edits and removes fields', () => {
+    let p = addField(p0, []);
+    expect(xml(p)).toContain('<field for="W" to="T" on="B"/>');
+    p = updateField(p, [], 0, { from: 'T', recompute: true });
+    expect(xml(p)).toContain('<field for="W" from="T" on="B" recompute="True"/>');
+    p = updateField(p, [], 0, { to: 'TB', recompute: false, essential: true });
+    expect(xml(p)).toContain('<field for="W" to="TB" on="B" essential="True"/>');
+    p = updateNode(p, [], { temperature: 5 });
+    expect(xml(p)).toContain('temperature="5"');
+    p = updateNode(p, [], { temperature: 0 });
+    expect(xml(p)).not.toContain('temperature');
+    expect(validateProgram(p)).toEqual([]);
+    p = removeField(p, [], 0);
+    expect(p.root).not.toHaveProperty('fields');
+  });
+
+  it('counts and renames symbols used in fields', () => {
+    const p = addField(p0, []);
+    expect(symbolUsage(p, 'T')).toBe(1);
+    expect(xml(renameSymbol(p, 'T', 'G'))).toContain('<field for="W" to="G" on="B"/>');
   });
 });

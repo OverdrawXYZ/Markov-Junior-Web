@@ -1,5 +1,6 @@
 import type { Context } from './context';
 import { ProgramError } from './errors';
+import { Field } from './field';
 import type { Grid } from './grid';
 import { AllNode } from './nodes/all';
 import { Branch, MarkovNode, SequenceNode, type Node } from './nodes/node';
@@ -11,6 +12,7 @@ import {
   isBranch,
   isConvolution,
   type ConvolutionNodeDef,
+  type FieldDef,
   type NodeDef,
   type NodePath,
   type Program,
@@ -51,11 +53,15 @@ function compileNode(def: NodeDef, path: NodePath, inherited: SymmetryMask, ctx:
     rules.push(...base.symmetries(resolveSymmetry(ruleDef.symmetry, symmetry)!));
   }
   const steps = def.steps ?? 0;
+  const options = {
+    fields: compileFields(def.fields, ctx.grid),
+    temperature: def.temperature ?? 0,
+  };
   switch (def.kind) {
     case 'one':
-      return new OneNode(ctx, path, rules, steps);
+      return new OneNode(ctx, path, rules, steps, options);
     case 'all':
-      return new AllNode(ctx, path, rules, steps);
+      return new AllNode(ctx, path, rules, steps, options);
     case 'prl':
       return new PrlNode(ctx, path, rules, steps);
   }
@@ -98,4 +104,21 @@ function compileConvolution(
     def.periodic ?? false,
     def.steps ?? 0,
   );
+}
+
+/** Per-symbol compiled fields, or null if the node has none. */
+function compileFields(defs: readonly FieldDef[] | undefined, grid: Grid): (Field | null)[] | null {
+  if (!defs || defs.length === 0) return null;
+  const fields: (Field | null)[] = new Array<Field | null>(grid.C).fill(null);
+  for (const f of defs) {
+    fields[grid.values.get(f.for)!] = new Field(
+      grid.wave(f.on),
+      grid.wave(f.from ?? f.to ?? ''),
+      f.from !== undefined,
+      f.recompute ?? false,
+      f.essential ?? false,
+      grid.state.length,
+    );
+  }
+  return fields;
 }

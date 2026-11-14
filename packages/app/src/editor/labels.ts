@@ -1,4 +1,4 @@
-import type { ConvolutionRuleDef, NodeDef } from '@mj/engine';
+import type { ConvolutionRuleDef, FieldDef, NodeDef } from '@mj/engine';
 
 /** Largest rule pattern the painter offers. */
 export const MAX_PATTERN = 9;
@@ -29,4 +29,16 @@ export function describeConvolutionRule(rule: ConvolutionRuleDef, neighbours: nu
   }
   const counted = [...rule.values].join(' or ');
   return `Each ${rule.in} cell becomes ${rule.out} when ${rule.sum.replace(/\.\./g, '–').replace(/,/g, ', ')} of its ${neighbours} neighbours are ${counted}${chance}.`;
+}
+
+const list = (symbols: string) => [...symbols].join(', ');
+
+/** Plain-language reading of a field, e.g. "W grows towards T, through B." */
+export function describeField(field: FieldDef): string {
+  const direction =
+    field.from !== undefined ? `away from ${list(field.from)}` : `towards ${list(field.to ?? '')}`;
+  const extras = [field.recompute ? 'recomputed every step' : '', field.essential ? 'required' : '']
+    .filter(Boolean)
+    .join(', ');
+  return `${field.for} is placed ${direction}, measured through ${list(field.on)}${extras ? ` (${extras})` : ''}.`;
 }

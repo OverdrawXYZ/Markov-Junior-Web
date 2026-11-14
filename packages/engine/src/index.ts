@@ -7,6 +7,7 @@ export type {
   BranchNodeDef,
   ConvolutionNodeDef,
   ConvolutionRuleDef,
+  FieldDef,
   Neighborhood,
   BranchNodeKind,
   NodeDef,

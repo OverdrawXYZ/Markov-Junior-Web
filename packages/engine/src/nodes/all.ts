@@ -1,14 +1,23 @@
 import type { Context } from '../context';
 import type { NodePath } from '../program';
 import { WILDCARD_OUT, type Rule } from '../rule';
-import { RuleNode } from './rule-node';
+import { deltaPointwise } from '../field';
+import { RuleNode, type RuleNodeOptions } from './rule-node';
 
 /** Applies a maximal set of non-overlapping matches, in random order, per turn. */
 export class AllNode extends RuleNode {
   private order = new Int32Array(64);
+  private keys = new Float64Array(64);
+  private readonly ranked: number[] = [];
 
-  constructor(ctx: Context, path: NodePath, rules: Rule[], steps: number) {
-    super(ctx, path, rules, steps);
+  constructor(
+    ctx: Context,
+    path: NodePath,
+    rules: Rule[],
+    steps: number,
+    options?: RuleNodeOptions,
+  ) {
+    super(ctx, path, rules, steps, options);
     const cells = ctx.grid.state.length;
     this.matchMask = rules.map(() => new Uint8Array(cells));
   }
@@ -22,18 +31,63 @@ export class AllNode extends RuleNode {
     const { MX, MY } = grid;
     const count = this.matchCount;
 
-    if (this.order.length < count)
+    if (this.order.length < count) {
       this.order = new Int32Array(Math.max(count, this.order.length * 2));
+      this.keys = new Float64Array(this.order.length);
+    }
     const order = this.order;
-    // Inside-out Fisher–Yates: a uniformly random permutation of 0..count-1.
-    for (let i = 0; i < count; i++) {
-      const j = rng.nextInt(i + 1);
-      order[i] = order[j]!;
-      order[j] = i;
+    const d = this.matchData;
+    let applyCount = count;
+    if (this.potentials) {
+      // Best heuristic first; matches whose field can't reach are skipped.
+      const { state } = grid;
+      const keys = this.keys;
+      const ranked = this.ranked;
+      ranked.length = 0;
+      let firstH = 0;
+      let firstComputed = false;
+      for (let m = 0; m < count; m++) {
+        const o = m * 4;
+        const r = d[o]!;
+        const x = d[o + 1]!;
+        const y = d[o + 2]!;
+        const z = d[o + 3]!;
+        const h = deltaPointwise(
+          state,
+          this.rules[r]!,
+          x,
+          y,
+          z,
+          this.fields,
+          this.potentials,
+          MX,
+          MY,
+        );
+        if (h === null) {
+          // MarkovJunior leaves these flagged as listed, losing them until reset (see deviations.md).
+          this.matchMask![r]![x + y * MX + z * MX * MY] = 0;
+          continue;
+        }
+        if (!firstComputed) {
+          firstH = h;
+          firstComputed = true;
+        }
+        keys[m] = this.heuristicKey(h, firstH);
+        ranked.push(m);
+      }
+      ranked.sort((a, b) => keys[b]! - keys[a]!); // stable, like LINQ's OrderBy
+      for (let k = 0; k < ranked.length; k++) order[k] = ranked[k]!;
+      applyCount = ranked.length;
+    } else {
+      // Inside-out Fisher–Yates: a uniformly random permutation of 0..count-1.
+      for (let i = 0; i < count; i++) {
+        const j = rng.nextInt(i + 1);
+        order[i] = order[j]!;
+        order[j] = i;
+      }
     }
 
-    const d = this.matchData;
-    for (let k = 0; k < count; k++) {
+    for (let k = 0; k < applyCount; k++) {
       const m = order[k]! * 4;
       const r = d[m]!;
       const x = d[m + 1]!;

@@ -14,6 +14,20 @@ exports[`golden outputs > BasicSnake at size 23 1`] = `
 }
 `;
 
+exports[`golden outputs > BiasedGrowth at size 120 1`] = `
+{
+  "hash": "3aff2897",
+  "steps": 1000,
+}
+`;
+
+exports[`golden outputs > BiasedMazeGrowth at size 117 1`] = `
+{
+  "hash": "08684c65",
+  "steps": 400,
+}
+`;
+
 exports[`golden outputs > Cave at size 60 1`] = `
 {
   "hash": "cf67593c",
@@ -35,10 +49,31 @@ exports[`golden outputs > GameOfLife at size 120 1`] = `
 }
 `;
 
+exports[`golden outputs > GrowTo at size 120 1`] = `
+{
+  "hash": "03e1a3e0",
+  "steps": 2000,
+}
+`;
+
 exports[`golden outputs > Growth at size 59 1`] = `
 {
   "hash": "14036874",
   "steps": 3481,
+}
+`;
+
+exports[`golden outputs > Keys at size 33 1`] = `
+{
+  "hash": "03192b47",
+  "steps": 135,
+}
+`;
+
+exports[`golden outputs > Laplace at size 60 1`] = `
+{
+  "hash": "3a31ca82",
+  "steps": 1000,
 }
 `;
 

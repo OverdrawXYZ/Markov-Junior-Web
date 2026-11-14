@@ -17,6 +17,11 @@ const CASES: [name: string, size: number, maxSteps?: number][] = [
   ['NystromDungeon', 39],
   ['Cave', 60],
   ['GameOfLife', 120, 100],
+  ['BiasedGrowth', 120, 1000],
+  ['BiasedMazeGrowth', 117, 400],
+  ['Laplace', 60, 1000],
+  ['Keys', 33],
+  ['GrowTo', 120, 2000],
 ];
 
 describe('golden outputs', () => {

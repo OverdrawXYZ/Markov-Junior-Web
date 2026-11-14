@@ -2,6 +2,7 @@ import Basic from './Basic.xml?raw';
 import DrunkardsWalk from './DrunkardsWalk.xml?raw';
 import Islands from './Islands.xml?raw';
 import BasicSnake from './BasicSnake.xml?raw';
+import BiasedMazeGrowth from './BiasedMazeGrowth.xml?raw';
 import Cave from './Cave.xml?raw';
 import Flowers from './Flowers.xml?raw';
 import GameOfLife from './GameOfLife.xml?raw';
@@ -74,6 +75,13 @@ export const EXAMPLES: readonly Example[] = [
     description: 'Random growth from a seed cell.',
     source: Growth,
     size: 79,
+  },
+  {
+    id: 'BiasedMazeGrowth',
+    name: 'Biased maze',
+    description: 'A maze pulled towards the bottom edge by a distance field.',
+    source: BiasedMazeGrowth,
+    size: 59,
   },
   {
     id: 'Cave',

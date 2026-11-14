@@ -88,6 +88,7 @@ source (`Interpreter.cs`, `RuleNode.cs`, `OneNode.cs`, `AllNode.cs`, `ParallelNo
 │       │   │   ├── Inspector/      # selected node's properties + rules list
 │       │   │   ├── RuleEditor/     # paint in/out patterns, resize, symmetry preview, p
 │       │   │   ├── ConvolutionEditor/ # convolution rules in plain language
+│       │   │   ├── FieldsEditor/   # distance fields + temperature for one/all
 │       │   │   ├── Palette/        # symbols, colours, unions, origin
 │       │   │   ├── PatternView/    # a rule pattern as a tiny colour grid
 │       │   │   ├── Transport/      # run / pause / step / reset / speed / seed / size

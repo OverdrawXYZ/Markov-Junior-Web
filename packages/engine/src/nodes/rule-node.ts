@@ -1,7 +1,14 @@
 import type { Context } from '../context';
 import type { Rule } from '../rule';
 import type { NodePath } from '../program';
+import type { Field } from '../field';
 import { Node } from './node';
+
+export interface RuleNodeOptions {
+  /** fields[symbol] guides where that symbol is placed, or null. */
+  fields?: (Field | null)[] | null;
+  temperature?: number;
+}
 
 /**
  * Base class for nodes that apply rewrite rules. Keeps a list of candidate
@@ -23,11 +30,37 @@ export abstract class RuleNode extends Node {
   /** matchMask[r][cell] = 1 if the match (r, cell) is already in the list. */
   protected matchMask: Uint8Array[] | null = null;
 
-  constructor(ctx: Context, path: NodePath, rules: Rule[], steps: number) {
+  /** Per-symbol fields, or null when the node has none. */
+  protected readonly fields: (Field | null)[] | null;
+  /** potentials[symbol][cell]: that symbol's field (0 for symbols without one). */
+  protected readonly potentials: Int32Array[] | null;
+  protected readonly temperature: number;
+
+  constructor(
+    ctx: Context,
+    path: NodePath,
+    rules: Rule[],
+    steps: number,
+    options: RuleNodeOptions = {},
+  ) {
     super(ctx, path);
     this.rules = rules;
     this.steps = steps;
     this.last = new Uint8Array(rules.length);
+    this.fields = options.fields ?? null;
+    this.temperature = options.temperature ?? 0;
+    const cells = ctx.grid.state.length;
+    this.potentials = this.fields
+      ? Array.from({ length: ctx.grid.C }, () => new Int32Array(cells))
+      : null;
+  }
+
+  /** Selection key for a match with heuristic h (higher is better); see MarkovJunior. */
+  protected heuristicKey(h: number, first: number): number {
+    const u = this.ctx.rng.next();
+    return this.temperature > 0
+      ? Math.pow(u, Math.exp((h - first) / this.temperature))
+      : -h + 0.001 * u;
   }
 
   reset(): void {
@@ -108,6 +141,21 @@ export abstract class RuleNode extends Node {
               }
             }
       }
+    }
+
+    if (this.fields) {
+      let anySuccess = false;
+      let anyComputation = false;
+      for (let c = 0; c < this.fields.length; c++) {
+        const field = this.fields[c];
+        if (field && (this.counter === 0 || field.recompute)) {
+          const success = field.compute(this.potentials![c]!, grid);
+          if (!success && field.essential) return false;
+          anySuccess ||= success;
+          anyComputation = true;
+        }
+      }
+      if (anyComputation && !anySuccess) return false;
     }
     return true;
   }

@@ -21,11 +21,38 @@ export interface RuleDef {
 }
 
 export type RuleNodeKind = 'one' | 'all' | 'prl';
+
+/**
+ * A distance field that steers a `one`/`all` node: matches are preferred when
+ * they move `for` cells closer to the `to` symbols (or away from `from`),
+ * measured in steps through `on` cells.
+ */
+export interface FieldDef {
+  /** Symbol whose placement the field guides. */
+  for: string;
+  /** Symbols the distance may pass through. */
+  on: string;
+  /** Distance is measured from these symbols, attracting `for` (exclusive with `from`). */
+  to?: string;
+  /** Like `to` but repelling: `for` is pushed away from these symbols. */
+  from?: string;
+  /** Recompute the field every step instead of once when the node starts. */
+  recompute?: boolean;
+  /** Stop the node when this field can't be computed (no `to`/`from` cells exist). */
+  essential?: boolean;
+}
 export type BranchNodeKind = 'markov' | 'sequence';
 
 export interface RuleNodeDef {
   kind: RuleNodeKind;
   rules: RuleDef[];
+  /** Distance fields that bias which matches are applied (`one`/`all` only). */
+  fields?: FieldDef[];
+  /**
+   * With fields: 0 (default) always takes the best match; higher values pick
+   * more randomly.
+   */
+  temperature?: number;
   /** Maximum number of steps this node may take before it stops (0 / omitted = unlimited). */
   steps?: number;
   symmetry?: string;

@@ -2,6 +2,7 @@ import { useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
 import {
   isBranch,
   isConvolution,
+  isRuleNode,
   nodeAt,
   type NodeDef,
   type NodePath,
@@ -19,7 +20,7 @@ import {
   removeRule,
   samePath,
 } from '../../editor/ops';
-import { KIND_HINT } from '../../editor/labels';
+import { describeField, KIND_HINT } from '../../editor/labels';
 import { useApp, type Selection } from '../../store/app';
 import { PatternView } from '../PatternView/PatternView';
 import styles from './NodeTree.module.css';
@@ -128,6 +129,12 @@ function NodeRow({ node, path, program, drop, setDrop, onDrop }: RowProps) {
         {!branch && node.steps ? <span className={styles.meta}>×{node.steps}</span> : null}
         {'symmetry' in node && node.symmetry && (
           <span className={styles.meta}>{node.symmetry}</span>
+        )}
+        {isRuleNode(node) && node.fields && (
+          <span className={styles.meta} title={node.fields.map(describeField).join('\n')}>
+            {node.fields.length === 1 ? '1 field' : `${node.fields.length} fields`}
+            {node.temperature ? ` · t=${node.temperature}` : ''}
+          </span>
         )}
         {isConvolution(node) && (
           <span className={styles.meta}>
