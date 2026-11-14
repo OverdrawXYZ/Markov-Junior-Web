@@ -1,6 +1,8 @@
 import { useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
 import {
+  hasRules,
   isBranch,
+  isPath,
   isConvolution,
   isRuleNode,
   nodeAt,
@@ -20,7 +22,7 @@ import {
   removeRule,
   samePath,
 } from '../../editor/ops';
-import { describeField, KIND_HINT } from '../../editor/labels';
+import { describeField, describePathShort, KIND_HINT } from '../../editor/labels';
 import { useApp, type Selection } from '../../store/app';
 import { PatternView } from '../PatternView/PatternView';
 import styles from './NodeTree.module.css';
@@ -40,7 +42,7 @@ const keyOf = (path: NodePath) => path.join('/');
 function flatten(node: NodeDef, path: NodePath, out: Selection[] = []): Selection[] {
   out.push({ path });
   if (isBranch(node)) node.children.forEach((c, i) => flatten(c, [...path, i], out));
-  else node.rules.forEach((_, rule) => out.push({ path, rule }));
+  else if (hasRules(node)) node.rules.forEach((_, rule) => out.push({ path, rule }));
   return out;
 }
 
@@ -126,7 +128,8 @@ function NodeRow({ node, path, program, drop, setDrop, onDrop }: RowProps) {
           {node.kind}
         </span>
         {node.comment && <span className={styles.comment}>{node.comment}</span>}
-        {!branch && node.steps ? <span className={styles.meta}>×{node.steps}</span> : null}
+        {hasRules(node) && node.steps ? <span className={styles.meta}>×{node.steps}</span> : null}
+        {isPath(node) && <span className={styles.meta}>{describePathShort(node)}</span>}
         {'symmetry' in node && node.symmetry && (
           <span className={styles.meta}>{node.symmetry}</span>
         )}
@@ -199,7 +202,7 @@ function NodeRow({ node, path, program, drop, setDrop, onDrop }: RowProps) {
         ) : (
           <p className={styles.emptyBranch}>Empty — drag nodes here</p>
         )
-      ) : (
+      ) : hasRules(node) ? (
         <ul className={styles.rules} role="group">
           {node.rules.map((rule, i) => {
             const sel = sameSelection(selection, { path, rule: i });
@@ -249,7 +252,7 @@ function NodeRow({ node, path, program, drop, setDrop, onDrop }: RowProps) {
             );
           })}
         </ul>
-      )}
+      ) : null}
     </li>
   );
 }

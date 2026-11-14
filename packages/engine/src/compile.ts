@@ -6,11 +6,13 @@ import { AllNode } from './nodes/all';
 import { Branch, MarkovNode, SequenceNode, type Node } from './nodes/node';
 import { ConvolutionNode, KERNELS_2D } from './nodes/convolution';
 import { OneNode } from './nodes/one';
+import { PathNode } from './nodes/path';
 import { parseSum } from './convolution-sum';
 import { PrlNode } from './nodes/prl';
 import {
   isBranch,
   isConvolution,
+  isPath,
   type ConvolutionNodeDef,
   type FieldDef,
   type NodeDef,
@@ -39,6 +41,19 @@ export function compileProgram(program: Program, ctx: Context): Branch {
 
 function compileNode(def: NodeDef, path: NodePath, inherited: SymmetryMask, ctx: Context): Node {
   if (isConvolution(def)) return compileConvolution(def, path, ctx);
+  if (isPath(def)) {
+    const { grid } = ctx;
+    return new PathNode(ctx, path, {
+      start: grid.wave(def.from),
+      finish: grid.wave(def.to),
+      substrate: grid.wave(def.on),
+      value: grid.values.get(def.color ?? def.from[0]!)!,
+      inertia: def.inertia ?? false,
+      longest: def.longest ?? false,
+      edges: def.edges ?? false,
+      vertices: def.vertices ?? false,
+    });
+  }
   const symmetry = resolveSymmetry(def.symmetry, inherited)!;
 
   if (isBranch(def)) {

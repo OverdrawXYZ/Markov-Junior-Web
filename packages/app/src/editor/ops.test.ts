@@ -28,6 +28,7 @@ import {
   unwrapNode,
   updateField,
   updateNode,
+  updatePath,
   updateRule,
   wrapNode,
 } from './ops';
@@ -301,5 +302,24 @@ describe('fields', () => {
     const p = addField(p0, []);
     expect(symbolUsage(p, 'T')).toBe(1);
     expect(xml(renameSymbol(p, 'T', 'G'))).toContain('<field for="W" to="G" on="B"/>');
+  });
+});
+
+describe('path nodes', () => {
+  const p0 = load('<sequence values="DRUW"><path from="R" to="U" on="D"/></sequence>');
+
+  it('creates, edits and validates paths', () => {
+    expect(newNode('path', p0)).toEqual({ kind: 'path', from: 'R', to: 'U', on: 'D' });
+    let p = updatePath(p0, [0], { color: 'W', edges: true, inertia: false, on: 'DW' });
+    expect(xml(p)).toContain('<path from="R" to="U" on="DW" color="W" edges="True"/>');
+    p = updatePath(p, [0], { color: undefined, edges: false });
+    expect(xml(p)).toContain('<path from="R" to="U" on="DW"/>');
+    expect(validateProgram(p)).toEqual([]);
+    expect(setKind(p, [0], 'one')).toBe(p);
+  });
+
+  it('counts and renames symbols used by paths', () => {
+    expect(symbolUsage(p0, 'U')).toBe(1);
+    expect(xml(renameSymbol(p0, 'R', 'G'))).toContain('<path from="G" to="U" on="D"/>');
   });
 });

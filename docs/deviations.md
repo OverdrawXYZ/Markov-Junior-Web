@@ -17,12 +17,13 @@ Behaviour that knowingly differs from the reference implementation
 | `convolution` changes                                   | Not written to the change log                                                               | Written to the change log                                       | Later `one`/`all` nodes match incrementally from the change log; unrecorded changes made them miss cells.                                                                                                |
 | `values` on a root `<convolution>` with an inline rule  | Read as both the alphabet and the counted symbols                                           | Always the alphabet; such rules are written as a `<rule>` child | The attribute is ambiguous there.                                                                                                                                                                        |
 | `all` + fields: matches whose field can't reach         | Skipped but left flagged as "listed", so they are never found again until the node restarts | Skipped and unflagged, so later turns can reconsider them       | Losing matches permanently looks unintended.                                                                                                                                                             |
+| `path` when a symbol is both a start and a goal         | May start from a cell already at the goal and walk off through unreachable cells            | Only starts that are at least one step from a goal are used     | The reference behaviour is undefined there.                                                                                                                                                              |
 
 ## Not implemented yet (rejected with a clear error)
 
 - Rules loaded from images: `file`, `fin`, `fout`, `legend` (and `folder`).
 - `<observe>`, `search` (roadmap phase 6).
-- `path`, `map`, `convchain`, `wfc` nodes (roadmap phase 6).
+- `map`, `convchain`, `wfc` nodes (roadmap phase 6).
 - 3D convolution kernels (`NoCorners`) — 2D `Moore` and `VonNeumann` are supported.
 - 3D grids and patterns, cube symmetries (roadmap phase 7).
 

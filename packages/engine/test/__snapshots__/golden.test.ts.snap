@@ -35,6 +35,13 @@ exports[`golden outputs > Cave at size 60 1`] = `
 }
 `;
 
+exports[`golden outputs > ConnectedCaves at size 60 1`] = `
+{
+  "hash": "aa02fe97",
+  "steps": 127,
+}
+`;
+
 exports[`golden outputs > Flowers at size 60 1`] = `
 {
   "hash": "182b1eac",
@@ -95,6 +102,13 @@ exports[`golden outputs > NystromDungeon at size 39 1`] = `
 {
   "hash": "58434257",
   "steps": 521,
+}
+`;
+
+exports[`golden outputs > Percolation at size 60 1`] = `
+{
+  "hash": "0cfffae8",
+  "steps": 4,
 }
 `;
 

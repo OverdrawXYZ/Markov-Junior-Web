@@ -98,7 +98,32 @@ export interface ConvolutionNodeDef {
   comment?: string;
 }
 
-export type NodeDef = RuleNodeDef | BranchNodeDef | ConvolutionNodeDef;
+/**
+ * Draws one shortest path per step from a `from` cell to the nearest `to` cell,
+ * walking only through `on` cells, painting it in `color`.
+ */
+export interface PathNodeDef {
+  kind: 'path';
+  /** Start symbols (the path begins next to one of these). */
+  from: string;
+  /** Goal symbols. */
+  to: string;
+  /** Symbols the path may cross. */
+  on: string;
+  /** Symbol to paint; defaults to the first `from` symbol. */
+  color?: string;
+  /** Prefer to keep going in the same direction. */
+  inertia?: boolean;
+  /** Start from the farthest start cell instead of the nearest. */
+  longest?: boolean;
+  /** Allow diagonal steps. */
+  edges?: boolean;
+  /** Allow corner-diagonal steps (3D only). */
+  vertices?: boolean;
+  comment?: string;
+}
+
+export type NodeDef = RuleNodeDef | BranchNodeDef | ConvolutionNodeDef | PathNodeDef;
 
 export interface UnionDef {
   /** Single character used in rule inputs. */
@@ -122,6 +147,15 @@ export function isBranch(node: NodeDef): node is BranchNodeDef {
 
 export function isRuleNode(node: NodeDef): node is RuleNodeDef {
   return node.kind === 'one' || node.kind === 'all' || node.kind === 'prl';
+}
+
+/** Nodes with a `rules` list (rule nodes and convolutions). */
+export function hasRules(node: NodeDef): node is RuleNodeDef | ConvolutionNodeDef {
+  return isRuleNode(node) || isConvolution(node);
+}
+
+export function isPath(node: NodeDef): node is PathNodeDef {
+  return node.kind === 'path';
 }
 
 export function isConvolution(node: NodeDef): node is ConvolutionNodeDef {

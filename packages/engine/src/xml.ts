@@ -2,9 +2,11 @@ import { ProgramError, type Issue } from './errors';
 import {
   isBranch,
   isConvolution,
+  isPath,
   type ConvolutionNodeDef,
   type ConvolutionRuleDef,
   type FieldDef,
+  type PathNodeDef,
   type BranchNodeDef,
   type NodeDef,
   type NodePath,
@@ -27,7 +29,19 @@ export const pathKey = (path: NodePath): string => path.join('/');
 
 const RULE_NODES = new Set(['one', 'all', 'prl']);
 const BRANCH_NODES = new Set(['markov', 'sequence']);
-const UNSUPPORTED_NODES = new Set(['path', 'map', 'convchain', 'wfc']);
+const UNSUPPORTED_NODES = new Set(['map', 'convchain', 'wfc']);
+const PATH_ATTRS = [
+  'from',
+  'to',
+  'on',
+  'color',
+  'inertia',
+  'longest',
+  'edges',
+  'vertices',
+  'comment',
+];
+const PATH_FLAGS = ['inertia', 'longest', 'edges', 'vertices'] as const;
 const CONVOLUTION_ATTRS = ['neighborhood', 'periodic', 'steps', 'comment'];
 const CONVOLUTION_RULE_ATTRS = ['in', 'out', 'p', 'values', 'sum'];
 const UNSUPPORTED_CHILDREN = new Set(['observe']);
@@ -217,6 +231,28 @@ export function programFromXml(source: string): XmlParseResult {
       return node;
     }
 
+    if (el.name === 'path') {
+      checkAttributes(el, [...PATH_ATTRS, ...extra], path);
+      for (const child of el.children) {
+        issues.push({
+          message: `unexpected <${child.name}> inside <path>`,
+          line: child.line,
+          path,
+        });
+      }
+      const get = (name: string) => (el.attributes.get(name) ?? '').replace(/ /g, '');
+      for (const name of ['from', 'to', 'on']) {
+        if (!el.attributes.has(name))
+          issues.push({ message: `<path> needs a ${name} attribute`, line: el.line, path });
+      }
+      const node: PathNodeDef = { kind: 'path', from: get('from'), to: get('to'), on: get('on') };
+      const color = el.attributes.get('color');
+      if (color !== undefined) node.color = color;
+      for (const flag of PATH_FLAGS) if (readBool(el, flag)) node[flag] = true;
+      if (comment !== undefined) node.comment = comment;
+      return node;
+    }
+
     if (el.name === 'convolution') {
       const neighborhood = el.attributes.get('neighborhood');
       if (neighborhood === undefined) {
@@ -339,6 +375,21 @@ export function programToXml(program: Program): string {
       out.push(...children);
       for (const child of node.children) emit(child, depth + 1, [], []);
       out.push(`${pad}</${node.kind}>`);
+      return;
+    }
+
+    if (isPath(node)) {
+      out.push(
+        `${pad}<path${attrs([
+          ...rootAttrs,
+          ['from', node.from],
+          ['to', node.to],
+          ['on', node.on],
+          ['color', node.color],
+          ...PATH_FLAGS.map((f): [string, string | undefined] => [f, node[f] ? 'True' : undefined]),
+          ['comment', node.comment],
+        ])}${children.length ? `>\n${children.join('\n')}\n${pad}</path>` : '/>'}`,
+      );
       return;
     }
 

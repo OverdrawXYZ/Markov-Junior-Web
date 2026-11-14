@@ -22,6 +22,8 @@ const CASES: [name: string, size: number, maxSteps?: number][] = [
   ['Laplace', 60, 1000],
   ['Keys', 33],
   ['GrowTo', 120, 2000],
+  ['Percolation', 60],
+  ['ConnectedCaves', 60],
 ];
 
 describe('golden outputs', () => {

@@ -5,11 +5,14 @@
  */
 import {
   isBranch,
+  hasRules,
   isConvolution,
+  isPath,
   isRuleNode,
   type ConvolutionNodeDef,
   type ConvolutionRuleDef,
   type FieldDef,
+  type PathNodeDef,
   type Neighborhood,
   nodeAt,
   type BranchNodeDef,
@@ -29,6 +32,7 @@ export const NODE_KINDS: readonly NodeDef['kind'][] = [
   ...RULE_KINDS,
   ...BRANCH_KINDS,
   'convolution',
+  'path',
 ];
 
 /** Nodes that hold a list of rules. */
@@ -38,7 +42,7 @@ export type AnyRule = RuleDef | ConvolutionRuleDef;
 /** Kinds a node can be switched between without losing its contents. */
 export function kindFamily(kind: NodeDef['kind']): readonly NodeDef['kind'][] {
   if (isRuleKind(kind)) return RULE_KINDS;
-  if (kind === 'convolution') return ['convolution'];
+  if (kind === 'convolution' || kind === 'path') return [kind];
   return BRANCH_KINDS;
 }
 
@@ -89,7 +93,7 @@ function mapRuleNode(
   path: NodePath,
   fn: (node: RulesNode) => RulesNode,
 ): Program {
-  return mapNode(program, path, (n) => (isBranch(n) ? n : fn(n)));
+  return mapNode(program, path, (n) => (hasRules(n) ? fn(n) : n));
 }
 
 export function defaultRule(program: Program): RuleDef {
@@ -108,6 +112,10 @@ export function newNode(kind: NodeDef['kind'], program: Program): NodeDef {
   if (isRuleKind(kind)) return { kind, rules: [defaultRule(program)] };
   if (kind === 'convolution') {
     return { kind, neighborhood: 'Moore', rules: [defaultConvolutionRule(program)] };
+  }
+  if (kind === 'path') {
+    const v = program.values;
+    return { kind, from: v[1] ?? v[0] ?? 'B', to: v[2] ?? v[1] ?? v[0] ?? 'B', on: v[0] ?? 'B' };
   }
   return { kind, children: [] };
 }
@@ -374,7 +382,8 @@ function mapRules(program: Program, fn: <R extends AnyRule>(rule: R) => R): Node
   const rec = (node: NodeDef): NodeDef => {
     if (isBranch(node)) return { ...node, children: node.children.map(rec) };
     if (isConvolution(node)) return { ...node, rules: node.rules.map(fn) };
-    return { ...node, rules: node.rules.map(fn) };
+    if (isRuleNode(node)) return { ...node, rules: node.rules.map(fn) };
+    return node;
   };
   return rec(program.root);
 }
@@ -385,7 +394,13 @@ function allFields(node: NodeDef): FieldDef[] {
 }
 
 function allRules(node: NodeDef): AnyRule[] {
-  return isBranch(node) ? node.children.flatMap(allRules) : node.rules;
+  if (isBranch(node)) return node.children.flatMap(allRules);
+  return hasRules(node) ? node.rules : [];
+}
+
+function allPaths(node: NodeDef): PathNodeDef[] {
+  if (isBranch(node)) return node.children.flatMap(allPaths);
+  return isPath(node) ? [node] : [];
 }
 
 /** How many rules (plus unions) refer to symbol `ch`. */
@@ -399,7 +414,10 @@ export function symbolUsage(program: Program, ch: string): number {
   const fields = allFields(program.root).filter((f) =>
     [f.for, f.on, f.to ?? '', f.from ?? ''].some((part) => part.includes(ch)),
   ).length;
-  return rules + unions + fields;
+  const paths = allPaths(program.root).filter((n) =>
+    [n.from, n.to, n.on, n.color ?? ''].some((part) => part.includes(ch)),
+  ).length;
+  return rules + unions + fields + paths;
 }
 
 /** Characters that may not be used as a new symbol or union. */
@@ -433,6 +451,16 @@ export function renameSymbol(program: Program, from: string, to: string): Progra
   const unions = program.unions?.map((u) => ({ symbol: swap(u.symbol), values: swap(u.values) }));
   const renameFields = (node: NodeDef): NodeDef => {
     if (isBranch(node)) return { ...node, children: node.children.map(renameFields) };
+    if (isPath(node)) {
+      const next: PathNodeDef = {
+        ...node,
+        from: swap(node.from),
+        to: swap(node.to),
+        on: swap(node.on),
+      };
+      if (node.color !== undefined) next.color = swap(node.color);
+      return next;
+    }
     if (!isRuleNode(node) || !node.fields) return node;
     return {
       ...node,
@@ -552,4 +580,24 @@ export function updateField(
 
 export function removeField(program: Program, path: NodePath, index: number): Program {
   return mapFields(program, path, (fields) => fields.filter((_, i) => i !== index));
+}
+
+// ---------------------------------------------------------------- paths
+
+/** Patch a path node; `undefined`/`false` remove optional keys. */
+export function updatePath(
+  program: Program,
+  path: NodePath,
+  patch: Partial<Record<'from' | 'to' | 'on' | 'color', string | undefined>> &
+    Partial<Record<'inertia' | 'longest' | 'edges' | 'vertices', boolean>>,
+): Program {
+  return mapNode(program, path, (n) => {
+    if (!isPath(n)) return n;
+    const next: Record<string, unknown> = { ...n };
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === undefined || v === false) delete next[k];
+      else next[k] = v;
+    }
+    return next as unknown as PathNodeDef;
+  });
 }

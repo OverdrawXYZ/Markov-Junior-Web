@@ -1,4 +1,4 @@
-import type { ConvolutionRuleDef, FieldDef, NodeDef } from '@mj/engine';
+import type { ConvolutionRuleDef, FieldDef, NodeDef, PathNodeDef } from '@mj/engine';
 
 /** Largest rule pattern the painter offers. */
 export const MAX_PATTERN = 9;
@@ -10,6 +10,7 @@ export const KIND_HINT: Record<NodeDef['kind'], string> = {
   markov: 'Each step, run the first child that can still progress',
   sequence: 'Run children in order, each until it is done',
   convolution: 'Cellular automaton: every cell checks its neighbours, all at once',
+  path: 'Draw a shortest path from one symbol to another, one path per step',
 };
 
 export const SYMMETRY_LABELS: Record<string, string> = {
@@ -41,4 +42,22 @@ export function describeField(field: FieldDef): string {
     .filter(Boolean)
     .join(', ');
   return `${field.for} is placed ${direction}, measured through ${list(field.on)}${extras ? ` (${extras})` : ''}.`;
+}
+
+/** Compact tree label for a path node, e.g. "R → U via D". */
+export function describePathShort(node: PathNodeDef): string {
+  return `${node.from} → ${node.to} via ${node.on}`;
+}
+
+/** Plain-language reading of a path node. */
+export function describePath(node: PathNodeDef): string {
+  const color = node.color ?? node.from[0] ?? '?';
+  const start = node.longest ? 'the farthest' : 'the nearest';
+  const extras = [
+    node.edges ? 'diagonal steps allowed' : '',
+    node.inertia ? 'prefers going straight' : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
+  return `Each step draws a ${color} path from ${start} ${list(node.from)} to ${list(node.to)}, through ${list(node.on)}${extras ? ` (${extras})` : ''}.`;
 }

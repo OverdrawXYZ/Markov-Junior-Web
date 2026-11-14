@@ -1,0 +1,53 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summary {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--chip);
+  font-size: 13px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.label {
+  width: 72px;
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.set {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.member {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 4px;
+  color: transparent;
+  opacity: 0.25;
+}
+
+.member[aria-pressed='true'] {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}

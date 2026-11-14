@@ -4,6 +4,7 @@ import Islands from './Islands.xml?raw';
 import BasicSnake from './BasicSnake.xml?raw';
 import BiasedMazeGrowth from './BiasedMazeGrowth.xml?raw';
 import Cave from './Cave.xml?raw';
+import ConnectedCaves from './ConnectedCaves.xml?raw';
 import Flowers from './Flowers.xml?raw';
 import GameOfLife from './GameOfLife.xml?raw';
 import Growth from './Growth.xml?raw';
@@ -88,6 +89,13 @@ export const EXAMPLES: readonly Example[] = [
     name: 'Cave',
     description: 'Noise smoothed into caves by a cellular automaton.',
     source: Cave,
+    size: 60,
+  },
+  {
+    id: 'ConnectedCaves',
+    name: 'Connected caves',
+    description: 'Caves joined up by drawing shortest paths between them.',
+    source: ConnectedCaves,
     size: 60,
   },
   {

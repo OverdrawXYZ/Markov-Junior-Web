@@ -1,8 +1,10 @@
 import {
   DEFAULT_SYMMETRY,
   effectiveSymmetry,
+  hasRules,
   isBranch,
   isConvolution,
+  isPath,
   isRuleNode,
   nodeAt,
   type Neighborhood,
@@ -32,6 +34,7 @@ import { NumberField } from '../NumberField/NumberField';
 import { PatternView } from '../PatternView/PatternView';
 import { ConvolutionEditor } from '../ConvolutionEditor/ConvolutionEditor';
 import { FieldsEditor } from '../FieldsEditor/FieldsEditor';
+import { PathEditor } from '../PathEditor/PathEditor';
 import { RuleEditor } from '../RuleEditor/RuleEditor';
 import styles from './Inspector.module.css';
 
@@ -119,7 +122,7 @@ function RuleList({
   const edit = useApp((s) => s.edit);
   const select = useApp((s) => s.select);
   const node = nodeAt(program.root, path);
-  if (!node || isBranch(node)) return null;
+  if (!node || !hasRules(node)) return null;
   return (
     <div className={styles.section}>
       <h3 className={styles.sectionTitle}>Rules</h3>
@@ -282,7 +285,7 @@ export function Inspector() {
           />
         </label>
 
-        {!isBranch(node) && (
+        {hasRules(node) && (
           <label className={styles.field}>
             <span className={styles.label}>Max steps</span>
             <NumberField
@@ -299,7 +302,9 @@ export function Inspector() {
           </label>
         )}
 
-        {conv ? (
+        {isPath(node) ? (
+          <PathEditor program={program} path={path} />
+        ) : conv ? (
           <>
             <label className={styles.field}>
               <span className={styles.label}>Neighbours</span>
@@ -351,7 +356,7 @@ export function Inspector() {
         <NodeActions program={program} path={path} node={node} />
       </div>
 
-      {!isBranch(node) && <RuleList program={program} path={path} selectedRule={selection.rule} />}
+      {hasRules(node) && <RuleList program={program} path={path} selectedRule={selection.rule} />}
 
       {isRuleNode(node) && node.kind !== 'prl' && (
         <div className={styles.section}>
@@ -382,7 +387,7 @@ export function Inspector() {
           />
         </div>
       )}
-      {!isBranch(node) && selection.rule === undefined && node.rules.length > 0 && (
+      {hasRules(node) && selection.rule === undefined && node.rules.length > 0 && (
         <p className={styles.muted}>Pick a rule above to edit it.</p>
       )}
     </div>

@@ -5,7 +5,9 @@ import { KERNELS_2D } from './nodes/convolution';
 import {
   isBranch,
   isConvolution,
+  isPath,
   type ConvolutionNodeDef,
+  type PathNodeDef,
   type NodeDef,
   type NodePath,
   type Program,
@@ -55,6 +57,10 @@ export function validateProgram(program: Program): Issue[] {
     }
     if (isBranch(node)) {
       node.children.forEach((child, i) => visit(child, [...path, i]));
+      return;
+    }
+    if (isPath(node)) {
+      validatePath(node, path, seen, issues);
       return;
     }
     if (node.steps !== undefined && !(Number.isInteger(node.steps) && node.steps >= 0)) {
@@ -197,5 +203,27 @@ function validateFields(
     }
     if ((f.to ?? f.from ?? 'x') === '')
       issues.push({ message: `${label}: "to"/"from" is empty`, path });
+  }
+}
+
+function validatePath(
+  node: PathNodeDef,
+  path: NodePath,
+  values: ReadonlySet<string>,
+  issues: Issue[],
+): void {
+  for (const [attr, symbols] of [
+    ['from', node.from],
+    ['to', node.to],
+    ['on', node.on],
+  ] as const) {
+    if (symbols.length === 0) issues.push({ message: `path needs "${attr}" symbols`, path });
+    for (const ch of new Set(symbols)) {
+      if (!values.has(ch))
+        issues.push({ message: `path: unknown symbol ${ch} in "${attr}"`, path });
+    }
+  }
+  if (node.color !== undefined && ([...node.color].length !== 1 || !values.has(node.color))) {
+    issues.push({ message: `path: color must be one of the symbols, got "${node.color}"`, path });
   }
 }
