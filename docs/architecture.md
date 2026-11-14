@@ -140,3 +140,12 @@ else (selection, zoom, speed, history) is per-session UI state.
 - **Keyboard shortcuts** are defined once in `editor/actions.ts` (`SHORTCUTS`) and drive both
   the global handler and the help dialog. They're ignored while typing in a field, while a
   dialog is open, and Space is left to focused buttons.
+
+### Advanced nodes (phase 6)
+
+| Node                   | Engine                                                      | Notes                                                                                                                                                                               |
+| ---------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `convolution`          | `nodes/convolution.ts`                                      | Neighbour counts from the turn's start, then first matching rule per cell. Changes are logged.                                                                                      |
+| fields + `temperature` | `field.ts`, `RuleNode.scan`, `OneNode.bestMatch`, `AllNode` | BFS distance per guided symbol; matches ranked by potential change.                                                                                                                 |
+| `path`                 | `nodes/path.ts`                                             | BFS from goals, downhill walk from nearest/farthest start.                                                                                                                          |
+| `map`                  | `nodes/map.ts`, `compileMap`                                | Builds a second `Grid` at compile time; children compile against it (`ctx.grid` is swapped during their compilation and at run time). Detached: the program halts when it finishes. |

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { isConvolution, nodeAt, parseSum, type NodePath, type Program } from '@mj/engine';
 import { describeConvolutionRule } from '../../editor/labels';
-import { updateRule } from '../../editor/ops';
+import { scopedProgram, updateRule } from '../../editor/ops';
 import { useColor } from '../../hooks/usePalette';
 import { useApp } from '../../store/app';
 import styles from './ConvolutionEditor.module.css';
@@ -46,7 +46,8 @@ interface Props {
   index: number;
 }
 
-export function ConvolutionEditor({ program, path, index }: Props) {
+export function ConvolutionEditor({ program: fullProgram, path, index }: Props) {
+  const program = scopedProgram(fullProgram, path);
   const edit = useApp((s) => s.edit);
   const color = useColor();
   const node = nodeAt(program.root, path);

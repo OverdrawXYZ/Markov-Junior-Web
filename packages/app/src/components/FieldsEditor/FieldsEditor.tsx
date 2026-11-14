@@ -1,6 +1,6 @@
 import { isRuleNode, nodeAt, type FieldDef, type NodePath, type Program } from '@mj/engine';
 import { describeField } from '../../editor/labels';
-import { addField, removeField, updateField, updateNode } from '../../editor/ops';
+import { addField, removeField, scopedProgram, updateField, updateNode } from '../../editor/ops';
 import { useColor } from '../../hooks/usePalette';
 import { useApp } from '../../store/app';
 import styles from './FieldsEditor.module.css';
@@ -136,7 +136,8 @@ function FieldRow({
 }
 
 /** Fields and temperature of a one/all node. */
-export function FieldsEditor({ program, path }: { program: Program; path: NodePath }) {
+export function FieldsEditor({ program: fullProgram, path }: { program: Program; path: NodePath }) {
+  const program = scopedProgram(fullProgram, path);
   const edit = useApp((s) => s.edit);
   const node = nodeAt(program.root, path);
   if (!node || !isRuleNode(node) || node.kind === 'prl') return null;

@@ -123,7 +123,34 @@ export interface PathNodeDef {
   comment?: string;
 }
 
-export type NodeDef = RuleNodeDef | BranchNodeDef | ConvolutionNodeDef | PathNodeDef;
+/** A rule of a `map` node: an input pattern in the outer alphabet, an output in the map's. */
+export interface MapRuleDef {
+  in: string;
+  /** May differ in size from `in`. */
+  out: string;
+  comment?: string;
+}
+
+/**
+ * Replaces the grid with a rescaled one that has its own alphabet. On its first
+ * step it translates the old grid through its rules; then its children run on
+ * the new grid. When they finish, the whole program halts.
+ */
+export interface MapNodeDef {
+  kind: 'map';
+  /** Scale per axis, "x y z", each "N" or "N/D", e.g. "3 3 1" or "1/2 1/2 1". */
+  scale: string;
+  /** Alphabet of the new grid; its first symbol fills it. */
+  values: string;
+  /** Unions available inside the map. */
+  unions?: UnionDef[];
+  rules: MapRuleDef[];
+  children: NodeDef[];
+  symmetry?: string;
+  comment?: string;
+}
+
+export type NodeDef = RuleNodeDef | BranchNodeDef | ConvolutionNodeDef | PathNodeDef | MapNodeDef;
 
 export interface UnionDef {
   /** Single character used in rule inputs. */
@@ -141,8 +168,42 @@ export interface Program {
   root: NodeDef;
 }
 
-export function isBranch(node: NodeDef): node is BranchNodeDef {
-  return node.kind === 'markov' || node.kind === 'sequence';
+/** Nodes with children: `markov`, `sequence` and `map`. */
+export function isBranch(node: NodeDef): node is BranchNodeDef | MapNodeDef {
+  return node.kind === 'markov' || node.kind === 'sequence' || node.kind === 'map';
+}
+
+export function isMap(node: NodeDef): node is MapNodeDef {
+  return node.kind === 'map';
+}
+
+/** The symbols and unions usable at some point in a program. */
+export interface Alphabet {
+  values: string;
+  unions: readonly UnionDef[];
+}
+
+/**
+ * The alphabet a node's rules use: the program's, or that of the innermost
+ * `map` containing the node. (A map node's own rule inputs use this alphabet;
+ * its outputs and children use the map's.)
+ */
+export function alphabetAt(program: Program, path: NodePath): Alphabet {
+  let scope: Alphabet = { values: program.values, unions: program.unions ?? [] };
+  let node: NodeDef = program.root;
+  for (const i of path) {
+    if (!isBranch(node)) break;
+    if (isMap(node)) scope = innerAlphabet(node);
+    const child: NodeDef | undefined = node.children[i];
+    if (!child) break;
+    node = child;
+  }
+  return scope;
+}
+
+/** The alphabet inside a map node. */
+export function innerAlphabet(node: MapNodeDef): Alphabet {
+  return { values: node.values, unions: node.unions ?? [] };
 }
 
 export function isRuleNode(node: NodeDef): node is RuleNodeDef {

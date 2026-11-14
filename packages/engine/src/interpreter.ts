@@ -27,11 +27,12 @@ export interface StepResult {
 }
 
 export interface Run {
+  /** Size of the current grid (a `map` node can change it mid-run). */
   readonly width: number;
   readonly height: number;
-  /** Symbol characters by index; `state[i]` indexes into this. */
+  /** Symbol characters of the current grid; `state[i]` indexes into this. */
   readonly characters: string;
-  /** Live grid state, x-fastest. Mutated in place by `step`. */
+  /** Live state of the current grid, x-fastest. Mutated in place by `step`. */
   readonly state: Uint8Array;
   readonly halted: boolean;
   readonly stepCount: number;
@@ -66,6 +67,7 @@ export function createRun(program: Program, options: RunOptions): Run {
   const reset = (newSeed?: number): void => {
     if (newSeed !== undefined) seed = newSeed;
     ctx.rng = createRng(seed);
+    ctx.grid = grid; // a map may have switched to its own grid
     grid.clear();
     if (origin) {
       const { MX, MY, MZ } = grid;
@@ -97,10 +99,19 @@ export function createRun(program: Program, options: RunOptions): Run {
   reset();
 
   return {
-    width,
-    height,
-    characters: grid.characters,
-    state: grid.state,
+    // A map node can replace the grid mid-run, so these follow the current one.
+    get width() {
+      return ctx.grid.MX;
+    },
+    get height() {
+      return ctx.grid.MY;
+    },
+    get characters() {
+      return ctx.grid.characters;
+    },
+    get state() {
+      return ctx.grid.state;
+    },
     get halted() {
       return ctx.current === null;
     },

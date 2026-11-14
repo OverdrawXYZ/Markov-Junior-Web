@@ -9,7 +9,14 @@ import {
   type Program,
   type RuleDef,
 } from '@mj/engine';
-import { cellAt, patternSize, resizePattern, setCell, updateRule } from '../../editor/ops';
+import {
+  cellAt,
+  patternSize,
+  resizePattern,
+  scopedProgram,
+  setCell,
+  updateRule,
+} from '../../editor/ops';
 import { useColor } from '../../hooks/usePalette';
 import { MAX_PATTERN, SYMMETRY_LABELS } from '../../editor/labels';
 import { useApp } from '../../store/app';
@@ -28,7 +35,7 @@ interface GridProps {
 }
 
 /** A pattern you can paint by clicking or dragging. Right-click paints `*`. */
-function PaintGrid({ pattern, side, values, onPaint, onStrokeStart }: GridProps) {
+export function PaintGrid({ pattern, side, values, onPaint, onStrokeStart }: GridProps) {
   const color = useColor();
   const { w, h } = patternSize(pattern);
   const stroke = useRef<{ last: string; erase: boolean } | null>(null);
@@ -100,14 +107,16 @@ function PaintGrid({ pattern, side, values, onPaint, onStrokeStart }: GridProps)
   );
 }
 
-function Brushes({
+export function Brushes({
   program,
   brush,
   setBrush,
+  label = 'Brushes',
 }: {
   program: Program;
   brush: string;
   setBrush(b: string): void;
+  label?: string;
 }) {
   const color = useColor();
   const unions = program.unions ?? [];
@@ -128,7 +137,7 @@ function Brushes({
     </button>
   );
   return (
-    <div className={styles.brushes} role="toolbar" aria-label="Brushes">
+    <div className={styles.brushes} role="toolbar" aria-label={label}>
       {[...program.values].map((ch) => item(ch, ch, { background: color(ch) }))}
       {unions.map((u) => item(u.symbol, `${u.symbol} = ${u.values}`, undefined, true))}
       {item('*', '* (any / unchanged)')}
@@ -143,7 +152,8 @@ interface Props {
 }
 
 /** Visual editor for one rule: paint input and output, resize, symmetry, probability. */
-export function RuleEditor({ program, path, index }: Props) {
+export function RuleEditor({ program: fullProgram, path, index }: Props) {
+  const program = scopedProgram(fullProgram, path);
   const edit = useApp((s) => s.edit);
   const node = nodeAt(program.root, path);
   const rule = node && isRuleNode(node) ? node.rules[index] : undefined;

@@ -24,10 +24,12 @@ export abstract class Branch extends Node {
   parent: Branch | null = null;
   nodes: Node[] = [];
   n = 0;
+  /** A detached branch doesn't return control to its parent when done: the program halts (map). */
+  protected readonly detached: boolean = false;
 
   setChildren(nodes: Node[]): void {
     this.nodes = nodes;
-    for (const node of nodes) if (node instanceof Branch) node.parent = this;
+    for (const node of nodes) if (node instanceof Branch) node.parent = node.detached ? null : this;
   }
 
   go(): boolean {

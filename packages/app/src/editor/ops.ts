@@ -4,14 +4,18 @@
  * object when the edit is not applicable).
  */
 import {
+  alphabetAt,
   isBranch,
   hasRules,
   isConvolution,
+  isMap,
   isPath,
   isRuleNode,
   type ConvolutionNodeDef,
   type ConvolutionRuleDef,
   type FieldDef,
+  type MapNodeDef,
+  type MapRuleDef,
   type PathNodeDef,
   type Neighborhood,
   nodeAt,
@@ -33,6 +37,7 @@ export const NODE_KINDS: readonly NodeDef['kind'][] = [
   ...BRANCH_KINDS,
   'convolution',
   'path',
+  'map',
 ];
 
 /** Nodes that hold a list of rules. */
@@ -42,7 +47,7 @@ export type AnyRule = RuleDef | ConvolutionRuleDef;
 /** Kinds a node can be switched between without losing its contents. */
 export function kindFamily(kind: NodeDef['kind']): readonly NodeDef['kind'][] {
   if (isRuleKind(kind)) return RULE_KINDS;
-  if (kind === 'convolution' || kind === 'path') return [kind];
+  if (kind === 'convolution' || kind === 'path' || kind === 'map') return [kind];
   return BRANCH_KINDS;
 }
 
@@ -80,10 +85,12 @@ export function mapNode(program: Program, path: NodePath, fn: (node: NodeDef) =>
   return root === program.root ? program : { ...program, root };
 }
 
+type BranchLike = BranchNodeDef | MapNodeDef;
+
 function mapBranch(
   program: Program,
   path: NodePath,
-  fn: (node: BranchNodeDef) => BranchNodeDef,
+  fn: (node: BranchLike) => BranchLike,
 ): Program {
   return mapNode(program, path, (n) => (isBranch(n) ? fn(n) : n));
 }
@@ -112,6 +119,9 @@ export function newNode(kind: NodeDef['kind'], program: Program): NodeDef {
   if (isRuleKind(kind)) return { kind, rules: [defaultRule(program)] };
   if (kind === 'convolution') {
     return { kind, neighborhood: 'Moore', rules: [defaultConvolutionRule(program)] };
+  }
+  if (kind === 'map') {
+    return { kind, scale: '2 2 1', values: program.values, rules: [], children: [] };
   }
   if (kind === 'path') {
     const v = program.values;
@@ -269,7 +279,8 @@ export function wrapNode(program: Program, path: NodePath, kind: BranchNodeKind)
 /** Replace a branch with its children (the root only if it has exactly one child). */
 export function unwrapNode(program: Program, path: NodePath): Program {
   const node = nodeAt(program.root, path);
-  if (!node || !isBranch(node)) return program;
+  // A map's children use its alphabet, so they can't simply move out of it.
+  if (!node || !isBranch(node) || isMap(node)) return program;
   if (path.length === 0) {
     return node.children.length === 1 ? { ...program, root: node.children[0]! } : program;
   }
@@ -378,27 +389,23 @@ export const cellAt = (pattern: string, x: number, y: number): string | undefine
 // ---------------------------------------------------------------- symbols
 
 /** Apply `fn` to every rule (of rule and convolution nodes). */
-function mapRules(program: Program, fn: <R extends AnyRule>(rule: R) => R): NodeDef {
-  const rec = (node: NodeDef): NodeDef => {
-    if (isBranch(node)) return { ...node, children: node.children.map(rec) };
-    if (isConvolution(node)) return { ...node, rules: node.rules.map(fn) };
-    if (isRuleNode(node)) return { ...node, rules: node.rules.map(fn) };
-    return node;
-  };
-  return rec(program.root);
-}
+// The helpers below stay within one alphabet: they don't look inside maps, which
+// have their own. (A map's rule inputs do belong to the outer alphabet.)
 
 function allFields(node: NodeDef): FieldDef[] {
+  if (isMap(node)) return [];
   if (isBranch(node)) return node.children.flatMap(allFields);
   return isRuleNode(node) ? (node.fields ?? []) : [];
 }
 
-function allRules(node: NodeDef): AnyRule[] {
+function allRules(node: NodeDef): { in: string; out: string; values?: string }[] {
+  if (isMap(node)) return node.rules.map((r) => ({ in: r.in, out: '' }));
   if (isBranch(node)) return node.children.flatMap(allRules);
   return hasRules(node) ? node.rules : [];
 }
 
 function allPaths(node: NodeDef): PathNodeDef[] {
+  if (isMap(node)) return [];
   if (isBranch(node)) return node.children.flatMap(allPaths);
   return isPath(node) ? [node] : [];
 }
@@ -449,8 +456,15 @@ export function renameSymbol(program: Program, from: string, to: string): Progra
   if ((!isValue && !isUnion) || isReservedChar(program, to)) return program;
   const swap = (s: string) => [...s].map((c) => (c === from ? to : c)).join('');
   const unions = program.unions?.map((u) => ({ symbol: swap(u.symbol), values: swap(u.values) }));
-  const renameFields = (node: NodeDef): NodeDef => {
-    if (isBranch(node)) return { ...node, children: node.children.map(renameFields) };
+  const renameRule = <R extends AnyRule>(r: R): R => {
+    const next = { ...r, in: swap(r.in), out: swap(r.out) };
+    if ('values' in next && next.values !== undefined) next.values = swap(next.values);
+    return next;
+  };
+  const rec = (node: NodeDef): NodeDef => {
+    // Inside a map is another alphabet: only the map's rule inputs use this one.
+    if (isMap(node)) return { ...node, rules: node.rules.map((r) => ({ ...r, in: swap(r.in) })) };
+    if (isBranch(node)) return { ...node, children: node.children.map(rec) };
     if (isPath(node)) {
       const next: PathNodeDef = {
         ...node,
@@ -461,26 +475,19 @@ export function renameSymbol(program: Program, from: string, to: string): Progra
       if (node.color !== undefined) next.color = swap(node.color);
       return next;
     }
-    if (!isRuleNode(node) || !node.fields) return node;
-    return {
-      ...node,
-      fields: node.fields.map((f) => {
+    if (isConvolution(node)) return { ...node, rules: node.rules.map(renameRule) };
+    const next: RuleNodeDef = { ...node, rules: node.rules.map(renameRule) };
+    if (node.fields) {
+      next.fields = node.fields.map((f) => {
         const g: FieldDef = { ...f, for: swap(f.for), on: swap(f.on) };
         if (f.to !== undefined) g.to = swap(f.to);
         if (f.from !== undefined) g.from = swap(f.from);
         return g;
-      }),
-    };
+      });
+    }
+    return next;
   };
-  const next: Program = {
-    ...program,
-    values: swap(program.values),
-    root: mapRules({ ...program, root: renameFields(program.root) }, (r) => {
-      const next = { ...r, in: swap(r.in), out: swap(r.out) };
-      if ('values' in next && next.values !== undefined) next.values = swap(next.values);
-      return next;
-    }),
-  };
+  const next: Program = { ...program, values: swap(program.values), root: rec(program.root) };
   if (unions) next.unions = unions;
   return next;
 }
@@ -600,4 +607,85 @@ export function updatePath(
     }
     return next as unknown as PathNodeDef;
   });
+}
+
+// ---------------------------------------------------------------- maps
+
+/** Patch a map node's scale, alphabet or other fields. */
+export function updateMap(
+  program: Program,
+  path: NodePath,
+  patch: { scale?: string; values?: string },
+): Program {
+  return mapNode(program, path, (n) => (isMap(n) ? { ...n, ...patch } : n));
+}
+
+function mapMapRules(
+  program: Program,
+  path: NodePath,
+  fn: (rules: MapRuleDef[]) => MapRuleDef[],
+): Program {
+  return mapNode(program, path, (n) => (isMap(n) ? { ...n, rules: fn(n.rules) } : n));
+}
+
+/** A starting map rule: the outer first symbol becomes a block of the map's first symbol. */
+export function defaultMapRule(program: Program, path: NodePath): MapRuleDef {
+  const node = nodeAt(program.root, path);
+  const outer = alphabetAt(program, path).values;
+  const inner = node && isMap(node) ? node.values : outer;
+  const [nx, ny] = (node && isMap(node) ? node.scale : '1 1 1')
+    .split(/\s+/)
+    .map((p) => Math.max(1, parseInt(p) || 1));
+  const block = (ch: string) => Array.from({ length: ny! }, () => ch.repeat(nx!)).join('/');
+  return { in: outer[0] ?? 'B', out: block(inner[inner.length > 1 ? 1 : 0] ?? 'B') };
+}
+
+export function addMapRule(program: Program, path: NodePath, rule?: MapRuleDef): Program {
+  const next = rule ?? defaultMapRule(program, path);
+  return mapMapRules(program, path, (rules) => [...rules, next]);
+}
+
+export function updateMapRule(
+  program: Program,
+  path: NodePath,
+  index: number,
+  patch: { in?: string; out?: string; comment?: string | undefined },
+): Program {
+  return mapMapRules(program, path, (rules) =>
+    rules.map((r, i) => {
+      if (i !== index) return r;
+      const next: Record<string, unknown> = { ...r };
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === undefined || v === '') delete next[k];
+        else next[k] = v;
+      }
+      return next as unknown as MapRuleDef;
+    }),
+  );
+}
+
+export function removeMapRule(program: Program, path: NodePath, index: number): Program {
+  return mapMapRules(program, path, (rules) => rules.filter((_, i) => i !== index));
+}
+
+export function moveMapRule(program: Program, path: NodePath, from: number, to: number): Program {
+  return mapMapRules(program, path, (rules) => {
+    if (from === to || !rules[from] || to < 0 || to >= rules.length) return rules;
+    const next = rules.slice();
+    const [r] = next.splice(from, 1);
+    next.splice(to, 0, r!);
+    return next;
+  });
+}
+
+/**
+ * The program as seen from `path`: the same tree, with `values` and `unions`
+ * replaced by the alphabet in scope there (a map's, inside a map). For display
+ * and pickers; edits still go through the real program.
+ */
+export function scopedProgram(program: Program, path: NodePath): Program {
+  const { values, unions } = alphabetAt(program, path);
+  const sameUnions = unions === program.unions || (unions.length === 0 && !program.unions?.length);
+  if (values === program.values && sameUnions) return program;
+  return { ...program, values, unions: [...unions] };
 }

@@ -1,9 +1,11 @@
 import {
   DEFAULT_SYMMETRY,
   effectiveSymmetry,
+  alphabetAt,
   hasRules,
   isBranch,
   isConvolution,
+  isMap,
   isPath,
   isRuleNode,
   nodeAt,
@@ -34,6 +36,7 @@ import { NumberField } from '../NumberField/NumberField';
 import { PatternView } from '../PatternView/PatternView';
 import { ConvolutionEditor } from '../ConvolutionEditor/ConvolutionEditor';
 import { FieldsEditor } from '../FieldsEditor/FieldsEditor';
+import { MapEditor } from '../MapEditor/MapEditor';
 import { PathEditor } from '../PathEditor/PathEditor';
 import { RuleEditor } from '../RuleEditor/RuleEditor';
 import styles from './Inspector.module.css';
@@ -88,7 +91,7 @@ function NodeActions({ program, path, node }: { program: Program; path: NodePath
       >
         Wrap in sequence
       </button>
-      {isBranch(node) && (
+      {isBranch(node) && !isMap(node) && (
         <button
           type="button"
           onClick={() => edit((p) => unwrapNode(p, path), { select: isRoot ? { path: [] } : null })}
@@ -123,6 +126,7 @@ function RuleList({
   const select = useApp((s) => s.select);
   const node = nodeAt(program.root, path);
   if (!node || !hasRules(node)) return null;
+  const scope = alphabetAt(program, path).values;
   return (
     <div className={styles.section}>
       <h3 className={styles.sectionTitle}>Rules</h3>
@@ -136,9 +140,9 @@ function RuleList({
               aria-label={`Edit rule ${i + 1}: ${rule.in} to ${rule.out}`}
               aria-pressed={selectedRule === i}
             >
-              <PatternView pattern={rule.in} values={program.values} />
+              <PatternView pattern={rule.in} values={scope} />
               <span aria-hidden>→</span>
-              <PatternView pattern={rule.out} values={program.values} />
+              <PatternView pattern={rule.out} values={scope} />
             </button>
             <span className={styles.ruleActions}>
               <button
@@ -355,6 +359,13 @@ export function Inspector() {
 
         <NodeActions program={program} path={path} node={node} />
       </div>
+
+      {isMap(node) && (
+        <div className={styles.section}>
+          <h3 className={styles.sectionTitle}>Map</h3>
+          <MapEditor program={program} path={path} selectedRule={selection.rule} />
+        </div>
+      )}
 
       {hasRules(node) && <RuleList program={program} path={path} selectedRule={selection.rule} />}
 

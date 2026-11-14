@@ -37,7 +37,8 @@ export function parsePattern(source: string): Pattern | string {
 
 /**
  * A compiled rewrite rule. Input cells are bitmasks over symbol indices ("waves");
- * output cells are symbol indices or WILDCARD_OUT. Input and output have equal size.
+ * output cells are symbol indices or WILDCARD_OUT. Input and output have the same
+ * size, except in `map` rules, which translate between grids.
  */
 export class Rule {
   readonly input: Int32Array;
@@ -45,6 +46,9 @@ export class Rule {
   readonly IMX: number;
   readonly IMY: number;
   readonly IMZ: number;
+  readonly OMX: number;
+  readonly OMY: number;
+  readonly OMZ: number;
   readonly p: number;
   readonly C: number;
   /**
@@ -61,12 +65,18 @@ export class Rule {
     IMZ: number,
     C: number,
     p = 1,
+    OMX = IMX,
+    OMY = IMY,
+    OMZ = IMZ,
   ) {
     this.input = input;
     this.output = output;
     this.IMX = IMX;
     this.IMY = IMY;
     this.IMZ = IMZ;
+    this.OMX = OMX;
+    this.OMY = OMY;
+    this.OMZ = OMZ;
     this.C = C;
     this.p = p;
 
@@ -82,38 +92,43 @@ export class Rule {
 
   /** Rotate 90° in the xy plane. */
   zRotated(): Rule {
-    const { IMX, IMY, IMZ } = this;
-    const input = new Int32Array(this.input.length);
-    const output = new Uint8Array(this.output.length);
-    for (let z = 0; z < IMZ; z++)
-      for (let y = 0; y < IMX; y++)
-        for (let x = 0; x < IMY; x++) {
-          const to = x + y * IMY + z * IMX * IMY;
-          const from = IMX - 1 - y + x * IMX + z * IMX * IMY;
-          input[to] = this.input[from]!;
-          output[to] = this.output[from]!;
-        }
-    return new Rule(input, output, IMY, IMX, IMZ, this.C, this.p);
+    const input = rotate(this.input, this.IMX, this.IMY, this.IMZ, Int32Array);
+    const output = rotate(this.output, this.OMX, this.OMY, this.OMZ, Uint8Array);
+    return new Rule(
+      input,
+      output,
+      this.IMY,
+      this.IMX,
+      this.IMZ,
+      this.C,
+      this.p,
+      this.OMY,
+      this.OMX,
+      this.OMZ,
+    );
   }
 
   /** Mirror in x. */
   reflected(): Rule {
-    const { IMX, IMY, IMZ } = this;
-    const input = new Int32Array(this.input.length);
-    const output = new Uint8Array(this.output.length);
-    for (let z = 0; z < IMZ; z++)
-      for (let y = 0; y < IMY; y++)
-        for (let x = 0; x < IMX; x++) {
-          const to = x + y * IMX + z * IMX * IMY;
-          const from = IMX - 1 - x + y * IMX + z * IMX * IMY;
-          input[to] = this.input[from]!;
-          output[to] = this.output[from]!;
-        }
-    return new Rule(input, output, IMX, IMY, IMZ, this.C, this.p);
+    const input = reflect(this.input, this.IMX, this.IMY, this.IMZ, Int32Array);
+    const output = reflect(this.output, this.OMX, this.OMY, this.OMZ, Uint8Array);
+    return new Rule(
+      input,
+      output,
+      this.IMX,
+      this.IMY,
+      this.IMZ,
+      this.C,
+      this.p,
+      this.OMX,
+      this.OMY,
+      this.OMZ,
+    );
   }
 
   static same(a: Rule, b: Rule): boolean {
     if (a.IMX !== b.IMX || a.IMY !== b.IMY || a.IMZ !== b.IMZ) return false;
+    if (a.OMX !== b.OMX || a.OMY !== b.OMY || a.OMZ !== b.OMZ) return false;
     for (let i = 0; i < a.input.length; i++) if (a.input[i] !== b.input[i]) return false;
     for (let i = 0; i < a.output.length; i++) if (a.output[i] !== b.output[i]) return false;
     return true;
@@ -129,4 +144,36 @@ export class Rule {
       subgroup,
     );
   }
+}
+
+type TypedArray = Int32Array | Uint8Array;
+
+function rotate<T extends TypedArray>(
+  src: T,
+  MX: number,
+  MY: number,
+  MZ: number,
+  Ctor: new (n: number) => T,
+): T {
+  const out = new Ctor(src.length);
+  for (let z = 0; z < MZ; z++)
+    for (let y = 0; y < MX; y++)
+      for (let x = 0; x < MY; x++)
+        out[x + y * MY + z * MX * MY] = src[MX - 1 - y + x * MX + z * MX * MY]!;
+  return out;
+}
+
+function reflect<T extends TypedArray>(
+  src: T,
+  MX: number,
+  MY: number,
+  MZ: number,
+  Ctor: new (n: number) => T,
+): T {
+  const out = new Ctor(src.length);
+  for (let z = 0; z < MZ; z++)
+    for (let y = 0; y < MY; y++)
+      for (let x = 0; x < MX; x++)
+        out[x + y * MX + z * MX * MY] = src[MX - 1 - x + y * MX + z * MX * MY]!;
+  return out;
 }

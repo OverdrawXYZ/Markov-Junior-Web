@@ -1,6 +1,6 @@
 import { isPath, nodeAt, type NodePath, type Program } from '@mj/engine';
 import { describePath } from '../../editor/labels';
-import { updatePath } from '../../editor/ops';
+import { scopedProgram, updatePath } from '../../editor/ops';
 import { useColor } from '../../hooks/usePalette';
 import { useApp } from '../../store/app';
 import styles from './PathEditor.module.css';
@@ -48,7 +48,8 @@ function SymbolSet({
 }
 
 /** Settings of a path node. */
-export function PathEditor({ program, path }: { program: Program; path: NodePath }) {
+export function PathEditor({ program: fullProgram, path }: { program: Program; path: NodePath }) {
+  const program = scopedProgram(fullProgram, path);
   const edit = useApp((s) => s.edit);
   const node = nodeAt(program.root, path);
   if (!node || !isPath(node)) return null;

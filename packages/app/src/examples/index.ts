@@ -9,6 +9,7 @@ import Flowers from './Flowers.xml?raw';
 import GameOfLife from './GameOfLife.xml?raw';
 import Growth from './Growth.xml?raw';
 import MazeBacktracker from './MazeBacktracker.xml?raw';
+import MarchingSquares from './MarchingSquares.xml?raw';
 import MazeGrowth from './MazeGrowth.xml?raw';
 import NystromDungeon from './NystromDungeon.xml?raw';
 import River from './River.xml?raw';
@@ -97,6 +98,13 @@ export const EXAMPLES: readonly Example[] = [
     description: 'Caves joined up by drawing shortest paths between them.',
     source: ConnectedCaves,
     size: 60,
+  },
+  {
+    id: 'MarchingSquares',
+    name: 'Marching squares',
+    description: 'Noise mapped onto a 3× grid of smooth shapes with a map node.',
+    source: MarchingSquares,
+    size: 20,
   },
   {
     id: 'GameOfLife',

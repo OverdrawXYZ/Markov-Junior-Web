@@ -11,6 +11,7 @@ export const KIND_HINT: Record<NodeDef['kind'], string> = {
   sequence: 'Run children in order, each until it is done',
   convolution: 'Cellular automaton: every cell checks its neighbours, all at once',
   path: 'Draw a shortest path from one symbol to another, one path per step',
+  map: 'Rescale the grid into a new alphabet, then run the children on it (the program ends after)',
 };
 
 export const SYMMETRY_LABELS: Record<string, string> = {

@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { programFromXml, programToXml, validateProgram, type Program } from '@mj/engine';
 import {
   addField,
+  addMapRule,
+  moveMapRule,
+  removeMapRule,
+  scopedProgram,
+  updateMap,
+  updateMapRule,
   addNode,
   addRule,
   addSymbol,
@@ -321,5 +327,56 @@ describe('path nodes', () => {
   it('counts and renames symbols used by paths', () => {
     expect(symbolUsage(p0, 'U')).toBe(1);
     expect(xml(renameSymbol(p0, 'R', 'G'))).toContain('<path from="G" to="U" on="D"/>');
+  });
+});
+
+describe('map nodes', () => {
+  const p0 = load(`<sequence values="BW">
+  <one in="B" out="W" steps="1"/>
+  <map scale="2 2 1" values="BA">
+    <rule in="W" out="AA/AA"/>
+    <one in="B" out="A"/>
+  </map>
+</sequence>`);
+
+  it('renames symbols only in the scope they belong to', () => {
+    // B exists outside and inside the map: renaming the outer B leaves the map's B alone.
+    const p = renameSymbol(p0, 'B', 'K');
+    expect(xml(p)).toBe(`<sequence values="KW">
+  <one in="K" out="W" steps="1"/>
+  <map scale="2 2 1" values="BA">
+    <rule in="W" out="AA/AA"/>
+    <one in="B" out="A"/>
+  </map>
+</sequence>`);
+    expect(xml(renameSymbol(p0, 'W', 'G'))).toContain('<rule in="G" out="AA/AA"/>');
+    expect(symbolUsage(p0, 'W')).toBe(2); // the one rule and the map rule's input
+  });
+
+  it('edits map settings and rules, and refuses to unwrap a map', () => {
+    let p = updateMap(p0, [1], { scale: '3 3 1', values: 'BAE' });
+    p = addMapRule(p, [1]);
+    expect(xml(p)).toContain('<rule in="B" out="AAA/AAA/AAA"/>');
+    p = updateMapRule(p, [1], 1, { out: 'E', comment: 'background' });
+    p = moveMapRule(p, [1], 1, 0);
+    expect(xml(p)).toMatch(
+      /<rule in="B" out="E" comment="background"\/>\s+<rule in="W" out="AA\/AA"\/>/,
+    );
+    p = removeMapRule(p, [1], 0);
+    expect(validateProgram(p)).toEqual([]);
+    expect(unwrapNode(p, [1])).toBe(p);
+    expect(newNode('map', p)).toEqual({
+      kind: 'map',
+      scale: '2 2 1',
+      values: 'BW',
+      rules: [],
+      children: [],
+    });
+  });
+
+  it('shows the alphabet in scope', () => {
+    expect(scopedProgram(p0, [1, 0]).values).toBe('BA');
+    expect(scopedProgram(p0, [1]).values).toBe('BW');
+    expect(scopedProgram(p0, [0])).toBe(p0);
   });
 });

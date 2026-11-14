@@ -131,8 +131,6 @@ let lastEdit = { key: '', at: 0 };
 let loaded: { program: Program; width: number; height: number } | null = null;
 /** Set when the user pauses or steps; edits then don't restart playback. */
 let userPaused = false;
-/** Characters of the loaded grid, needed to interpret frames. */
-let characters = '';
 
 /** Validation issues with source lines (the source is parsed for its line map). */
 function check(program: Program, source: string): Issue[] {
@@ -414,7 +412,6 @@ export const useApp = create<AppState>()((set, get) => {
 function onEngineMessage(msg: WorkerToMain): void {
   switch (msg.type) {
     case 'loaded':
-      characters = msg.characters;
       break;
     case 'error':
       useApp.setState({ issues: msg.issues, mode: 'paused' });
@@ -429,7 +426,7 @@ function onEngineMessage(msg: WorkerToMain): void {
         frames.publish({
           width: msg.width,
           height: msg.height,
-          characters,
+          characters: msg.characters,
           state: new Uint8Array(msg.state),
         });
       }

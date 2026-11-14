@@ -87,8 +87,8 @@ test('the gallery shows rendered thumbnails', async ({ page }) => {
   await expect(page.getByRole('tree', { name: 'Program tree' })).toBeVisible();
   await page.keyboard.press('g');
   const gallery = page.getByRole('dialog', { name: 'Examples' });
-  await expect(gallery.getByRole('listitem')).toHaveCount(14);
-  await expect(gallery.locator('img')).toHaveCount(14, { timeout: 15_000 });
+  await expect(gallery.getByRole('listitem')).toHaveCount(15);
+  await expect(gallery.locator('img')).toHaveCount(15, { timeout: 15_000 });
   for (const src of await gallery
     .locator('img')
     .evaluateAll((imgs) => imgs.map((i) => (i as HTMLImageElement).src))) {

@@ -1,10 +1,11 @@
 import type { Context } from './context';
 import { ProgramError } from './errors';
 import { Field } from './field';
-import type { Grid } from './grid';
+import { Grid } from './grid';
 import { AllNode } from './nodes/all';
 import { Branch, MarkovNode, SequenceNode, type Node } from './nodes/node';
 import { ConvolutionNode, KERNELS_2D } from './nodes/convolution';
+import { MapNode } from './nodes/map';
 import { OneNode } from './nodes/one';
 import { PathNode } from './nodes/path';
 import { parseSum } from './convolution-sum';
@@ -12,9 +13,11 @@ import { PrlNode } from './nodes/prl';
 import {
   isBranch,
   isConvolution,
+  isMap,
   isPath,
   type ConvolutionNodeDef,
   type FieldDef,
+  type MapNodeDef,
   type NodeDef,
   type NodePath,
   type Program,
@@ -22,7 +25,7 @@ import {
 } from './program';
 import { parsePattern, Rule, WILDCARD_OUT } from './rule';
 import { FULL_SQUARE_SYMMETRY, resolveSymmetry, type SymmetryMask } from './symmetry';
-import { validateProgram } from './validate';
+import { parseScaleComponent, validateProgram } from './validate';
 
 /**
  * Build the executable node tree. Throws ProgramError if the program is invalid.
@@ -56,6 +59,7 @@ function compileNode(def: NodeDef, path: NodePath, inherited: SymmetryMask, ctx:
   }
   const symmetry = resolveSymmetry(def.symmetry, inherited)!;
 
+  if (isMap(def)) return compileMap(def, path, symmetry, ctx);
   if (isBranch(def)) {
     const branch = def.kind === 'markov' ? new MarkovNode(ctx, path) : new SequenceNode(ctx, path);
     branch.setChildren(def.children.map((c, i) => compileNode(c, [...path, i], symmetry, ctx)));
@@ -136,4 +140,65 @@ function compileFields(defs: readonly FieldDef[] | undefined, grid: Grid): (Fiel
     );
   }
   return fields;
+}
+
+function compileMap(
+  def: MapNodeDef,
+  path: NodePath,
+  symmetry: SymmetryMask,
+  ctx: Context,
+): MapNode {
+  const source = ctx.grid;
+  const factors = def.scale
+    .trim()
+    .split(/\s+/)
+    .map((part) => parseScaleComponent(part)!);
+  const [NX, DX] = factors[0]!;
+  const [NY, DY] = factors[1]!;
+  const width = Math.floor((source.MX * NX) / DX);
+  const height = Math.floor((source.MY * NY) / DY);
+  if (width < 1 || height < 1) {
+    throw new ProgramError([
+      {
+        message: `map scale "${def.scale}" makes a ${width}×${height} grid from ${source.MX}×${source.MY}`,
+        path,
+      },
+    ]);
+  }
+  const target = new Grid(def.values, def.unions ?? [], width, height, 1);
+
+  const rules: Rule[] = [];
+  for (const r of def.rules) {
+    const inp = parsePattern(r.in);
+    const out = parsePattern(r.out);
+    if (typeof inp === 'string' || typeof out === 'string') throw new Error('invalid pattern');
+    const base = new Rule(
+      Int32Array.from(inp.chars, (ch) => source.waves.get(ch)!),
+      Uint8Array.from(out.chars, (ch) => (ch === '*' ? WILDCARD_OUT : target.values.get(ch)!)),
+      inp.MX,
+      inp.MY,
+      inp.MZ,
+      source.C,
+      1,
+      out.MX,
+      out.MY,
+      out.MZ,
+    );
+    rules.push(...base.symmetries(symmetry));
+  }
+
+  const node = new MapNode(ctx, path, source, target, rules, {
+    NX: NX!,
+    DX: DX!,
+    NY: NY!,
+    DY: DY!,
+  });
+  // Children allocate their buffers for, and run on, the map's grid.
+  ctx.grid = target;
+  try {
+    node.setChildren(def.children.map((c, i) => compileNode(c, [...path, i], symmetry, ctx)));
+  } finally {
+    ctx.grid = source;
+  }
+  return node;
 }

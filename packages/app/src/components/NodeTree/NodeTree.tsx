@@ -1,9 +1,11 @@
 import { useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
 import {
+  alphabetAt,
   hasRules,
   isBranch,
   isPath,
   isConvolution,
+  isMap,
   isRuleNode,
   nodeAt,
   type NodeDef,
@@ -41,6 +43,7 @@ const keyOf = (path: NodePath) => path.join('/');
 /** Every selectable row (nodes and their rules) in display order. */
 function flatten(node: NodeDef, path: NodePath, out: Selection[] = []): Selection[] {
   out.push({ path });
+  if (isMap(node)) node.rules.forEach((_, rule) => out.push({ path, rule }));
   if (isBranch(node)) node.children.forEach((c, i) => flatten(c, [...path, i], out));
   else if (hasRules(node)) node.rules.forEach((_, rule) => out.push({ path, rule }));
   return out;
@@ -86,6 +89,8 @@ function NodeRow({ node, path, program, drop, setDrop, onDrop }: RowProps) {
   const onActivePath =
     active !== null && (key === '' || active === key || active.startsWith(`${key}/`));
   const branch = isBranch(node);
+  // Patterns are drawn in the alphabet in scope here (a map's, inside a map).
+  const scope = alphabetAt(program, path).values;
   const dropHere = drop?.key === key ? drop.pos : undefined;
 
   const onDragOver = (e: DragEvent<HTMLDivElement>) => {
@@ -130,6 +135,11 @@ function NodeRow({ node, path, program, drop, setDrop, onDrop }: RowProps) {
         {node.comment && <span className={styles.comment}>{node.comment}</span>}
         {hasRules(node) && node.steps ? <span className={styles.meta}>×{node.steps}</span> : null}
         {isPath(node) && <span className={styles.meta}>{describePathShort(node)}</span>}
+        {isMap(node) && (
+          <span className={styles.meta}>
+            ×{node.scale.split(/\s+/).slice(0, 2).join('×')} → {node.values}
+          </span>
+        )}
         {'symmetry' in node && node.symmetry && (
           <span className={styles.meta}>{node.symmetry}</span>
         )}
@@ -184,6 +194,37 @@ function NodeRow({ node, path, program, drop, setDrop, onDrop }: RowProps) {
           </span>
         )}
       </div>
+      {isMap(node) && node.rules.length > 0 && (
+        <ul className={styles.rules} role="group" aria-label="Map rules">
+          {node.rules.map((rule, i) => {
+            const sel = sameSelection(selection, { path, rule: i });
+            return (
+              <li key={i} role="none">
+                <div
+                  className={styles.rule}
+                  role="treeitem"
+                  aria-selected={sel}
+                  aria-level={path.length + 2}
+                  aria-label={`map rule ${rule.in} to ${rule.out}`}
+                  data-selected={sel || undefined}
+                  onClick={() => select({ path, rule: i })}
+                >
+                  <PatternView pattern={rule.in} values={scope} label={`input ${rule.in}`} />
+                  <span className={styles.arrow} aria-hidden>
+                    ⇒
+                  </span>
+                  <PatternView
+                    pattern={rule.out}
+                    values={node.values}
+                    label={`output ${rule.out}`}
+                  />
+                  {rule.comment && <span className={styles.comment}>{rule.comment}</span>}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       {branch ? (
         node.children.length > 0 ? (
           <ul className={styles.children} role="group">
@@ -218,25 +259,17 @@ function NodeRow({ node, path, program, drop, setDrop, onDrop }: RowProps) {
                   data-selected={sel || undefined}
                   onClick={() => select({ path, rule: i })}
                 >
-                  <PatternView
-                    pattern={rule.in}
-                    values={program.values}
-                    label={`input ${rule.in}`}
-                  />
+                  <PatternView pattern={rule.in} values={scope} label={`input ${rule.in}`} />
                   <span className={styles.arrow} aria-hidden>
                     →
                   </span>
-                  <PatternView
-                    pattern={rule.out}
-                    values={program.values}
-                    label={`output ${rule.out}`}
-                  />
+                  <PatternView pattern={rule.out} values={scope} label={`output ${rule.out}`} />
                   {'values' in rule && rule.values !== undefined && (
                     <span className={styles.condition}>
                       if
                       <PatternView
                         pattern={[...rule.values].join('')}
-                        values={program.values}
+                        values={scope}
                         label={`counting ${rule.values}`}
                       />
                       <span className={styles.meta}>= {rule.sum}</span>

@@ -8,6 +8,9 @@ export type {
   ConvolutionNodeDef,
   ConvolutionRuleDef,
   FieldDef,
+  MapNodeDef,
+  MapRuleDef,
+  Alphabet,
   PathNodeDef,
   Neighborhood,
   BranchNodeKind,
@@ -19,7 +22,18 @@ export type {
   RuleNodeKind,
   UnionDef,
 } from './program';
-export { hasRules, isBranch, isConvolution, isPath, isRuleNode, nodeAt } from './program';
+export {
+  alphabetAt,
+  hasRules,
+  innerAlphabet,
+  isBranch,
+  isConvolution,
+  isMap,
+  isPath,
+  isRuleNode,
+  nodeAt,
+} from './program';
+export { parseScaleComponent } from './validate';
 export { parseSum, MAX_SUM } from './convolution-sum';
 
 export { ProgramError, formatIssue } from './errors';

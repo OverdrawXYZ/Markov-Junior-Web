@@ -84,6 +84,13 @@ exports[`golden outputs > Laplace at size 60 1`] = `
 }
 `;
 
+exports[`golden outputs > MarchingSquares at size 20 1`] = `
+{
+  "hash": "2399436f",
+  "steps": 3,
+}
+`;
+
 exports[`golden outputs > MazeBacktracker at size 59 1`] = `
 {
   "hash": "0cb2196c",
@@ -98,10 +105,24 @@ exports[`golden outputs > MazeGrowth at size 59 1`] = `
 }
 `;
 
+exports[`golden outputs > MazeMap at size 30 1`] = `
+{
+  "hash": "4ede6b41",
+  "steps": 3,
+}
+`;
+
 exports[`golden outputs > NystromDungeon at size 39 1`] = `
 {
   "hash": "58434257",
   "steps": 521,
+}
+`;
+
+exports[`golden outputs > OddScale at size 8 1`] = `
+{
+  "hash": "82d9b0ec",
+  "steps": 4,
 }
 `;
 

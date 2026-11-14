@@ -90,6 +90,7 @@ source (`Interpreter.cs`, `RuleNode.cs`, `OneNode.cs`, `AllNode.cs`, `ParallelNo
 │       │   │   ├── ConvolutionEditor/ # convolution rules in plain language
 │       │   │   ├── FieldsEditor/   # distance fields + temperature for one/all
 │       │   │   ├── PathEditor/     # path node settings
+│       │   │   ├── MapEditor/      # map scale, alphabet, translation rules
 │       │   │   ├── Palette/        # symbols, colours, unions, origin
 │       │   │   ├── PatternView/    # a rule pattern as a tiny colour grid
 │       │   │   ├── Transport/      # run / pause / step / reset / speed / seed / size
@@ -192,9 +193,15 @@ Notes:
   contract — people bookmark and send links. Add a new prefix/key instead of changing them.
 - Keyboard shortcuts live in one table, `SHORTCUTS` in `editor/actions.ts`; the help dialog is
   generated from it.
-- Node kinds: rule nodes (`one`/`all`/`prl`), branches (`markov`/`sequence`), `convolution` and
-  `path`. Don't assume "not a branch ⇒ has rules": use `hasRules` / `isRuleNode` /
-  `isConvolution` / `isPath` from the engine.
+- Node kinds: rule nodes (`one`/`all`/`prl`), branches (`markov`/`sequence`/`map`), `convolution`
+  and `path`. Don't assume "not a branch ⇒ has rules": use `hasRules` / `isRuleNode` /
+  `isConvolution` / `isPath` / `isMap` from the engine. `isBranch` is true for `map` too.
+- **Alphabets are scoped.** Inside a `map`, rules use the map's `values`/unions; a map's own rule
+  inputs use the outer alphabet. Use `alphabetAt(program, path)` (engine) or
+  `scopedProgram(program, path)` (app) — never `program.values` — when showing or validating a
+  node's symbols. Palette edits (rename, usage) stay in the top-level alphabet.
+- A `map` can change the grid's size and alphabet mid-run: `Run.width/height/characters/state`
+  are getters, and every worker frame carries its `characters`.
 - `npm run typecheck` uses `tsc -b --force`: plain `tsc -b` in the app can miss errors caused by
   engine changes because of its incremental cache.
 - Zustand selectors must return stable values: select the raw array/object and derive in the

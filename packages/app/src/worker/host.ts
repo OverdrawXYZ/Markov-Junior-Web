@@ -174,7 +174,14 @@ export class EngineHost {
     if (!this.run || !this.dirty || this.awaitingAck) return;
     const state = this.run.state.slice().buffer;
     this.post(
-      { type: 'frame', width: this.run.width, height: this.run.height, state, ...this.status() },
+      {
+        type: 'frame',
+        width: this.run.width,
+        height: this.run.height,
+        characters: this.run.characters,
+        state,
+        ...this.status(),
+      },
       [state],
     );
     this.dirty = false;

@@ -1,0 +1,142 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.label {
+  width: 72px;
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.factor,
+.values {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  font-family: var(--mono);
+}
+
+.factor {
+  width: 56px;
+}
+
+.values {
+  width: 120px;
+}
+
+.factor[aria-invalid='true'],
+.values[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.hint,
+.muted {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.sectionTitle {
+  margin: 6px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.rules {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ruleItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.ruleItem[data-selected] {
+  background: var(--accent-soft);
+  outline: 1px solid var(--accent);
+}
+
+.ruleSelect {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.ruleActions {
+  display: flex;
+  gap: 2px;
+}
+
+.ruleActions button {
+  padding: 0 6px;
+  font-size: 12px;
+}
+
+.add {
+  align-self: flex-start;
+  font-size: 12px;
+}
+
+.ruleEditor {
+  margin-top: 6px;
+}
+
+.sides {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.side {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.side figcaption {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.size {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.size button {
+  padding: 0 7px;
+}
+
+.num {
+  min-width: 34px;
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}

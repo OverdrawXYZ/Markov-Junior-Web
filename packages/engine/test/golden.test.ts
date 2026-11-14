@@ -24,6 +24,9 @@ const CASES: [name: string, size: number, maxSteps?: number][] = [
   ['GrowTo', 120, 2000],
   ['Percolation', 60],
   ['ConnectedCaves', 60],
+  ['MarchingSquares', 20],
+  ['MazeMap', 30],
+  ['OddScale', 8],
 ];
 
 describe('golden outputs', () => {

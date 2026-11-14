@@ -53,6 +53,8 @@ export type WorkerToMain =
       type: 'frame';
       width: number;
       height: number;
+      /** Symbols of the grid shown (a map node can switch to a new alphabet mid-run). */
+      characters: string;
       /** Copy of the grid state (transferred). */
       state: ArrayBuffer;
     } & Status);

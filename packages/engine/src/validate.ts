@@ -5,8 +5,11 @@ import { KERNELS_2D } from './nodes/convolution';
 import {
   isBranch,
   isConvolution,
+  isMap,
   isPath,
   type ConvolutionNodeDef,
+  type MapNodeDef,
+  type UnionDef,
   type PathNodeDef,
   type NodeDef,
   type NodePath,
@@ -17,57 +20,93 @@ import {
 import { parsePattern } from './rule';
 import { isSymmetryName } from './symmetry';
 
-/** Check a program for every error that can be detected without running it. */
-export function validateProgram(program: Program): Issue[] {
-  const issues: Issue[] = [];
-  const { values } = program;
-  const unions = program.unions ?? [];
+interface Scope {
+  /** Symbols of the grid. */
+  values: ReadonlySet<string>;
+  /** Characters allowed in rule inputs: symbols, unions and `*`. */
+  inputs: ReadonlySet<string>;
+}
 
-  if (values.length === 0) issues.push({ message: 'values must declare at least one symbol' });
+/** Check an alphabet (values + unions) and return its scope. */
+function checkAlphabet(
+  values: string,
+  unions: readonly UnionDef[],
+  issues: Issue[],
+  path?: NodePath,
+): Scope {
+  const at = path ? { path } : {};
+  if (values.length === 0)
+    issues.push({ message: 'values must declare at least one symbol', ...at });
   if (values.length > MAX_SYMBOLS) {
-    issues.push({ message: `at most ${MAX_SYMBOLS} symbols are supported, got ${values.length}` });
+    issues.push({
+      message: `at most ${MAX_SYMBOLS} symbols are supported, got ${values.length}`,
+      ...at,
+    });
   }
   const seen = new Set<string>();
   for (const ch of values) {
-    if (ch === '*' || /\s/.test(ch)) issues.push({ message: `"${ch}" cannot be used as a symbol` });
-    else if (seen.has(ch)) issues.push({ message: `repeating value ${ch}` });
+    if (ch === '*' || /\s/.test(ch))
+      issues.push({ message: `"${ch}" cannot be used as a symbol`, ...at });
+    else if (seen.has(ch)) issues.push({ message: `repeating value ${ch}`, ...at });
     seen.add(ch);
   }
-  if (program.origin && values.length < 2) {
+  const inputs = new Set([...values, '*']);
+  for (const u of unions) {
+    if ([...u.symbol].length !== 1) {
+      issues.push({ message: `union symbol must be a single character, got "${u.symbol}"`, ...at });
+      continue;
+    }
+    if (inputs.has(u.symbol)) issues.push({ message: `repeating union symbol ${u.symbol}`, ...at });
+    if (u.values.length === 0) issues.push({ message: `union ${u.symbol} has no values`, ...at });
+    for (const ch of u.values) {
+      if (!seen.has(ch))
+        issues.push({ message: `union ${u.symbol} uses unknown value ${ch}`, ...at });
+    }
+    inputs.add(u.symbol);
+  }
+  return { values: seen, inputs };
+}
+
+/** Parse one component of a map scale: "N" or "N/D" with positive integers. */
+export function parseScaleComponent(s: string): [number, number] | null {
+  const m = /^(\d+)(?:\/(\d+))?$/.exec(s);
+  if (!m) return null;
+  const n = Number(m[1]);
+  const d = m[2] === undefined ? 1 : Number(m[2]);
+  return n > 0 && d > 0 ? [n, d] : null;
+}
+
+/** Check a program for every error that can be detected without running it. */
+export function validateProgram(program: Program): Issue[] {
+  const issues: Issue[] = [];
+  const root = checkAlphabet(program.values, program.unions ?? [], issues);
+  if (program.origin && program.values.length < 2) {
     issues.push({ message: 'origin requires at least two symbols' });
   }
 
-  const inputSymbols = new Set([...values, '*']);
-  for (const u of unions) {
-    if ([...u.symbol].length !== 1) {
-      issues.push({ message: `union symbol must be a single character, got "${u.symbol}"` });
-      continue;
-    }
-    if (inputSymbols.has(u.symbol)) issues.push({ message: `repeating union symbol ${u.symbol}` });
-    if (u.values.length === 0) issues.push({ message: `union ${u.symbol} has no values` });
-    for (const ch of u.values) {
-      if (!seen.has(ch)) issues.push({ message: `union ${u.symbol} uses unknown value ${ch}` });
-    }
-    inputSymbols.add(u.symbol);
-  }
-
-  const visit = (node: NodeDef, path: NodePath): void => {
+  const visit = (node: NodeDef, path: NodePath, scope: Scope): void => {
     if ('symmetry' in node && node.symmetry !== undefined && !isSymmetryName(node.symmetry)) {
       issues.push({ message: `unknown symmetry ${node.symmetry}`, path });
     }
+    if (isMap(node)) {
+      const inner = checkAlphabet(node.values, node.unions ?? [], issues, path);
+      validateMap(node, path, scope, inner, issues);
+      node.children.forEach((child, i) => visit(child, [...path, i], inner));
+      return;
+    }
     if (isBranch(node)) {
-      node.children.forEach((child, i) => visit(child, [...path, i]));
+      node.children.forEach((child, i) => visit(child, [...path, i], scope));
       return;
     }
     if (isPath(node)) {
-      validatePath(node, path, seen, issues);
+      validatePath(node, path, scope.values, issues);
       return;
     }
     if (node.steps !== undefined && !(Number.isInteger(node.steps) && node.steps >= 0)) {
       issues.push({ message: `steps must be a non-negative integer, got ${node.steps}`, path });
     }
     if (isConvolution(node)) {
-      validateConvolution(node, path, seen, issues);
+      validateConvolution(node, path, scope.values, issues);
       return;
     }
     if (node.rules.length === 0) issues.push({ message: `${node.kind} node has no rules`, path });
@@ -77,11 +116,55 @@ export function validateProgram(program: Program): Issue[] {
     ) {
       issues.push({ message: `temperature must be 0 or more, got ${node.temperature}`, path });
     }
-    validateFields(node, path, seen, issues);
-    node.rules.forEach((rule, r) => validateRule(rule, path, r, inputSymbols, seen, issues));
+    validateFields(node, path, scope.values, issues);
+    node.rules.forEach((rule, r) =>
+      validateRule(rule, path, r, scope.inputs, scope.values, issues),
+    );
   };
-  visit(program.root, []);
+  visit(program.root, [], root);
   return issues;
+}
+
+function validateMap(
+  node: MapNodeDef,
+  path: NodePath,
+  outer: Scope,
+  inner: Scope,
+  issues: Issue[],
+): void {
+  const parts = node.scale.trim().split(/\s+/);
+  if (parts.length !== 3 || parts.some((p) => parseScaleComponent(p) === null)) {
+    issues.push({
+      message: `scale must be three factors like "2 2 1" or "1/2 1/2 1", got "${node.scale}"`,
+      path,
+    });
+  } else {
+    const [n, d] = parseScaleComponent(parts[2]!)!;
+    if (Math.floor(n / d) !== 1)
+      issues.push({ message: 'the z scale must be 1 (3D grids are not supported yet)', path });
+  }
+  node.rules.forEach((rule, r) => {
+    const at = { path, rule: r };
+    const inp = parsePattern(rule.in);
+    const out = parsePattern(rule.out);
+    if (typeof inp === 'string') issues.push({ message: `input: ${inp}`, ...at });
+    else {
+      if (inp.MZ > 1) issues.push({ message: '3D patterns are not supported yet', ...at });
+      for (const ch of new Set(inp.chars)) {
+        if (!outer.inputs.has(ch))
+          issues.push({ message: `input symbol ${ch} is not defined outside the map`, ...at });
+      }
+    }
+    if (typeof out === 'string') issues.push({ message: `output: ${out}`, ...at });
+    else {
+      if (out.MZ > 1) issues.push({ message: '3D patterns are not supported yet', ...at });
+      for (const ch of new Set(out.chars)) {
+        if (ch !== '*' && !inner.values.has(ch)) {
+          issues.push({ message: `output symbol ${ch} is not one of the map's values`, ...at });
+        }
+      }
+    }
+  });
 }
 
 function validateRule(

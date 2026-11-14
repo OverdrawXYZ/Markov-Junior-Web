@@ -2,10 +2,13 @@ import { ProgramError, type Issue } from './errors';
 import {
   isBranch,
   isConvolution,
+  isMap,
   isPath,
   type ConvolutionNodeDef,
   type ConvolutionRuleDef,
   type FieldDef,
+  type MapNodeDef,
+  type MapRuleDef,
   type PathNodeDef,
   type BranchNodeDef,
   type NodeDef,
@@ -29,7 +32,7 @@ export const pathKey = (path: NodePath): string => path.join('/');
 
 const RULE_NODES = new Set(['one', 'all', 'prl']);
 const BRANCH_NODES = new Set(['markov', 'sequence']);
-const UNSUPPORTED_NODES = new Set(['map', 'convchain', 'wfc']);
+const UNSUPPORTED_NODES = new Set(['convchain', 'wfc']);
 const PATH_ATTRS = [
   'from',
   'to',
@@ -51,6 +54,7 @@ const ROOT_ATTRS = ['values', 'origin'];
 const RULE_ATTRS = ['in', 'out', 'p', 'symmetry'];
 const RULE_NODE_ATTRS = ['symmetry', 'steps', 'comment', 'temperature'];
 const BRANCH_ATTRS = ['symmetry', 'comment'];
+const MAP_ATTRS = ['scale', 'values', 'symmetry', 'comment'];
 
 /** Parse MarkovJunior XML into a Program. Throws ProgramError on structural errors. */
 export function programFromXml(source: string): XmlParseResult {
@@ -109,7 +113,8 @@ export function programFromXml(source: string): XmlParseResult {
     return n;
   };
 
-  const readUnion = (el: XmlElement): void => {
+  /** Unions go to the alphabet in scope: the program's, or the innermost map's. */
+  const readUnion = (el: XmlElement, target: UnionDef[]): void => {
     checkAttributes(el, ['symbol', 'values']);
     const symbol = el.attributes.get('symbol');
     const values = el.attributes.get('values');
@@ -117,7 +122,7 @@ export function programFromXml(source: string): XmlParseResult {
       issues.push({ message: '<union> needs symbol and values attributes', line: el.line });
       return;
     }
-    unions.push({ symbol, values: values.replace(/ /g, '') });
+    target.push({ symbol, values: values.replace(/ /g, '') });
   };
 
   const readRule = (el: XmlElement, path: NodePath, rule?: number): RuleDef | null => {
@@ -142,7 +147,12 @@ export function programFromXml(source: string): XmlParseResult {
     return def;
   };
 
-  const readNode = (el: XmlElement, path: NodePath, isRoot: boolean): NodeDef | null => {
+  const readNode = (
+    el: XmlElement,
+    path: NodePath,
+    isRoot: boolean,
+    scope: UnionDef[],
+  ): NodeDef | null => {
     lines.set(pathKey(path), el.line);
     const extra = isRoot ? ROOT_ATTRS : [];
     const symmetry = el.attributes.get('symmetry');
@@ -155,12 +165,63 @@ export function programFromXml(source: string): XmlParseResult {
       if (comment !== undefined) node.comment = comment;
       for (const child of el.children) {
         if (child.name === 'union') {
-          readUnion(child);
+          readUnion(child, scope);
           continue;
         }
-        const c = readNode(child, [...path, node.children.length], false);
+        const c = readNode(child, [...path, node.children.length], false, scope);
         if (c) node.children.push(c);
       }
+      return node;
+    }
+
+    if (el.name === 'map') {
+      if (isRoot) {
+        issues.push({
+          message:
+            "<map> can't be the top-level node (its values would clash); put it inside a <sequence>",
+          line: el.line,
+          path,
+        });
+        return null;
+      }
+      checkAttributes(el, MAP_ATTRS, path);
+      const scale = el.attributes.get('scale');
+      const values = el.attributes.get('values');
+      if (scale === undefined)
+        issues.push({ message: '<map> needs a scale, e.g. "2 2 1"', line: el.line, path });
+      if (values === undefined)
+        issues.push({ message: '<map> needs values (its own alphabet)', line: el.line, path });
+      const node: MapNodeDef = {
+        kind: 'map',
+        scale: scale ?? '1 1 1',
+        values: (values ?? '').replace(/ /g, ''),
+        rules: [],
+        children: [],
+      };
+      if (symmetry !== undefined) node.symmetry = symmetry;
+      if (comment !== undefined) node.comment = comment;
+      const inner: UnionDef[] = [];
+      for (const child of el.children) {
+        if (child.name === 'union') {
+          readUnion(child, inner);
+        } else if (child.name === 'rule') {
+          checkAttributes(child, ['in', 'out', 'comment'], path);
+          const inp = child.attributes.get('in');
+          const out = child.attributes.get('out');
+          if (inp === undefined || out === undefined) {
+            issues.push({ message: 'map rule needs in and out', line: child.line, path });
+            continue;
+          }
+          const rule: MapRuleDef = { in: inp, out };
+          const ruleComment = child.attributes.get('comment');
+          if (ruleComment !== undefined) rule.comment = ruleComment;
+          node.rules.push(rule);
+        } else {
+          const c = readNode(child, [...path, node.children.length], false, inner);
+          if (c) node.children.push(c);
+        }
+      }
+      if (inner.length > 0) node.unions = inner;
       return node;
     }
 
@@ -191,7 +252,7 @@ export function programFromXml(source: string): XmlParseResult {
           (node.fields ??= []).push(field);
           continue;
         }
-        if (child.name === 'union' && isRoot) readUnion(child);
+        if (child.name === 'union' && isRoot) readUnion(child, scope);
         else if (child.name === 'union') {
           issues.push({
             message: '<union> must be declared at the top level or inside markov/sequence',
@@ -326,7 +387,7 @@ export function programFromXml(source: string): XmlParseResult {
   if (values === undefined)
     issues.push({ message: 'the root element needs a values attribute', line: rootEl.line });
   const origin = readBool(rootEl, 'origin');
-  const root = readNode(rootEl, [], true);
+  const root = readNode(rootEl, [], true, unions);
 
   if (issues.length > 0 || !root || values === undefined) throw new ProgramError(issues);
 
@@ -364,6 +425,42 @@ export function programToXml(program: Program): string {
     const childPad = '  '.repeat(depth + 1);
     const children: string[] = extraChildren.map((c) => childPad + c);
     let head: string;
+
+    if (isMap(node)) {
+      head = `<map${attrs([
+        ...rootAttrs,
+        ['scale', node.scale],
+        ['values', node.values],
+        ['symmetry', node.symmetry],
+        ['comment', node.comment],
+      ])}`;
+      for (const u of node.unions ?? []) {
+        children.push(
+          `${childPad}<union${attrs([
+            ['symbol', u.symbol],
+            ['values', u.values],
+          ])}/>`,
+        );
+      }
+      for (const r of node.rules) {
+        children.push(
+          `${childPad}<rule${attrs([
+            ['in', r.in],
+            ['out', r.out],
+            ['comment', r.comment],
+          ])}/>`,
+        );
+      }
+      if (children.length === 0 && node.children.length === 0) {
+        out.push(`${pad}${head}/>`);
+        return;
+      }
+      out.push(`${pad}${head}>`);
+      out.push(...children);
+      for (const child of node.children) emit(child, depth + 1, [], []);
+      out.push(`${pad}</map>`);
+      return;
+    }
 
     if (isBranch(node)) {
       head = `<${node.kind}${attrs([...rootAttrs, ['symmetry', node.symmetry], ['comment', node.comment]])}`;
