@@ -6,6 +6,8 @@ programming language, with a visual editor for building rules and previewing res
 MarkovJunior was created by Maxim Gumin and is MIT licensed. This project reimplements it in
 TypeScript for the browser.
 
+**Try it:** https://overdrawxyz.github.io/Markov-Junior-Web/
+
 ## Features
 
 - Runs MarkovJunior programs (`one`, `all`, `prl`, `markov`, `sequence`, unions, symmetry)
@@ -29,3 +31,10 @@ npm run test:e2e   # browser smoke test
 ```
 
 See [CLAUDE.md](./CLAUDE.md) for architecture, conventions and the roadmap.
+
+## Deployment
+
+Every push to `main` builds the app and publishes it to GitHub Pages
+(`.github/workflows/deploy.yml`). It can also be run by hand from the Actions tab
+("Deploy to GitHub Pages" → Run workflow). One-time setup: repository **Settings → Pages →
+Build and deployment → Source: GitHub Actions**.

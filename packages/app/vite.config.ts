@@ -3,6 +3,9 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  // Where the app is served from. GitHub Pages serves project sites under
+  // /<repo>/, so the deploy workflow sets BASE_PATH; locally it's the root.
+  base: process.env.BASE_PATH ?? '/',
   plugins: [react()],
   worker: { format: 'es' },
   test: {

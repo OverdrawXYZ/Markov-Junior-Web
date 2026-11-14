@@ -211,6 +211,9 @@ Notes:
 - Zustand selectors must return stable values: select the raw array/object and derive in the
   component. A selector that returns a new array (e.g. `s.issues.filter(...)`) loops forever.
 
+- Hosting: GitHub Pages at https://overdrawxyz.github.io/Markov-Junior-Web/, deployed from `main`
+  by `.github/workflows/deploy.yml`. The build reads `BASE_PATH` (Vite `base`) because Pages
+  serves the site under `/<repo>/`; never hard-code root-absolute URLs in the app.
 - The app imports the engine from source (`@mj/engine` → `packages/engine/src/index.ts`);
   there is no separate engine build step.
 - ESLint enforces engine purity: no React/zustand/app imports, no `window`/`document`,
